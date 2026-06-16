@@ -185,15 +185,30 @@ export class SupporthubController {
         projectId = created[0].id
       }
 
-      // Reconcile additional admins additively as ADMIN team members (idempotent).
+      // Reconcile EVERY admin (owner included) additively as an ADMIN team
+      // member AND a member of the tenant's single default project — both
+      // idempotent. Team membership alone is not enough: forms live in the
+      // project and the HeyForm UI gates form visibility on project
+      // membership, so a team-only admin lands in the workspace but sees no
+      // forms. The owner already holds both from createByNewTeam; the guards
+      // make re-adding a no-op.
       for (const admin of claims.admins) {
         const memberId = adminUserIds[admin.remoteId]
-        const member = await this.teamService.findMemberById(teamId, memberId)
-        if (helper.isEmpty(member)) {
+
+        const teamMember = await this.teamService.findMemberById(teamId, memberId)
+        if (helper.isEmpty(teamMember)) {
           await this.teamService.createMember({
             teamId,
             memberId,
             role: TeamRoleEnum.ADMIN
+          })
+        }
+
+        const projectMember = await this.projectService.findMemberById(projectId, memberId)
+        if (helper.isEmpty(projectMember)) {
+          await this.projectService.createMember({
+            projectId,
+            memberId
           })
         }
       }
