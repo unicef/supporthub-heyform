@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useRouter } from '@/utils'
 
 import { Avatar, Button } from '@/components'
+import { isSsoOnly } from '@/consts'
 import { useAppStore, useWorkspaceStore } from '@/store'
 import { WorkspaceType } from '@/types'
 
@@ -89,14 +90,19 @@ export default function WorkspaceSwitcher() {
             ))}
           </div>
 
-          <DropdownMenu.Separator className="bg-accent-light mx-2 mb-1 mt-2 h-px sm:mx-2" />
+          {/* supporthub-fork: no workspace creation in embedded SSO-only mode */}
+          {!isSsoOnly() && (
+            <>
+              <DropdownMenu.Separator className="bg-accent-light mx-2 mb-1 mt-2 h-px sm:mx-2" />
 
-          <DropdownMenu.Item onClick={() => openModal('CreateWorkspaceModal')}>
-            <Button.Link className="w-full [&_[data-slot=button]]:justify-start">
-              <IconPlus className="h-[1.125rem] w-[1.125rem]" />
-              <span>{t('workspace.creation.title')}</span>
-            </Button.Link>
-          </DropdownMenu.Item>
+              <DropdownMenu.Item onClick={() => openModal('CreateWorkspaceModal')}>
+                <Button.Link className="w-full [&_[data-slot=button]]:justify-start">
+                  <IconPlus className="h-[1.125rem] w-[1.125rem]" />
+                  <span>{t('workspace.creation.title')}</span>
+                </Button.Link>
+              </DropdownMenu.Item>
+            </>
+          )}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

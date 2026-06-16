@@ -35,6 +35,7 @@ export interface SsoClaims {
   sub: string
   jti: string
   exp: number
+  returnUrl?: string
 }
 
 /**
@@ -106,6 +107,7 @@ export function readSsoClaims(payload: jwt.JwtPayload): SsoClaims {
   return {
     sub: payload.sub,
     jti: payload.jti,
-    exp: Number(payload.exp)
+    exp: Number(payload.exp),
+    returnUrl: typeof payload.returnUrl === 'string' ? payload.returnUrl : undefined
   }
 }

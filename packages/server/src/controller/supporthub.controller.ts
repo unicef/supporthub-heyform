@@ -38,6 +38,20 @@ const SYNTHETIC_EMAIL_DOMAIN = 'heyform.local'
 const DEFAULT_PROJECT_NAME = 'Default'
 const SSO_JTI_TTL_SECONDS = 60
 
+// supporthub-fork: cookie the server injects into window.heyform.tenantReturnUrl
+// at page render (httpOnly: the SPA never reads it directly).
+const COOKIE_RETURN_URL_NAME = 'HEYFORM_RETURN_URL'
+
+// Only allow absolute http(s) URLs as a return target — reject javascript:/data:/etc.
+function isSafeReturnUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 // Server-enforced dest allowlist (see plan S2.3). Reject anything else.
 const DEST_ALLOWLIST: RegExp[] = [
   /^\/$/,
@@ -289,6 +303,19 @@ export class SupporthubController {
       httpOnly: false,
       path: '/'
     })
+
+    // supporthub-fork: persist the tenant's SupportHub admin URL so the dashboard
+    // controller can inject it into window.heyform.tenantReturnUrl. httpOnly: the
+    // server injects it at render, the SPA never reads the cookie directly.
+    if (helper.isValid(claims.returnUrl) && isSafeReturnUrl(claims.returnUrl!)) {
+      res.cookie(COOKIE_RETURN_URL_NAME, claims.returnUrl, {
+        domain: COOKIE_DOMAIN,
+        sameSite: 'lax',
+        secure: NODE_ENV === 'production',
+        httpOnly: true,
+        path: '/'
+      })
+    }
 
     this.logger.info(`sso login sub=${claims.sub} jti=${claims.jti} dest=${targetDest}`)
 

@@ -45,6 +45,13 @@ export function isSsoOnly() {
   return helper.isTrue(window.heyform?.ssoOnly)
 }
 
+// supporthub-fork: absolute URL of the tenant's SupportHub admin, injected by the
+// server at page render (window.heyform.tenantReturnUrl). Powers the embedded
+// "Back to tenant" button. undefined when not handed off via /sso.
+export function getTenantReturnUrl(): string | undefined {
+  return window.heyform?.tenantReturnUrl
+}
+
 export function getVerifyEmailResendCooldownSeconds() {
   const value = Number(window.heyform?.verifyEmailResendCooldownSeconds)
   return Number.isFinite(value) && value > 0 ? value : 60

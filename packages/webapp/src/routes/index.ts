@@ -29,6 +29,10 @@ const SignUpRoute = () =>
     ? createElement(Navigate, { to: '/login', replace: true })
     : createElement(SignUp)
 
+// supporthub-fork: workspace creation is unreachable in embedded SSO-only mode.
+const CreateWorkspaceRoute = () =>
+  isSsoOnly() ? createElement(Navigate, { to: '/', replace: true }) : createElement(CreateWorkspace)
+
 const routes = [
   {
     path: '/login',
@@ -92,7 +96,7 @@ const routes = [
   {
     path: '/workspace/create',
     layout: BaseLayout,
-    component: CreateWorkspace,
+    component: CreateWorkspaceRoute,
     options: {
       loginRequired: true
     }

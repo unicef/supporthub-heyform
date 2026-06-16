@@ -1,5 +1,5 @@
-import { Controller, Get, Header, Redirect, Res } from '@nestjs/common'
-import { Response } from 'express'
+import { Controller, Get, Header, Redirect, Req, Res } from '@nestjs/common'
+import { Request, Response } from 'express'
 
 import {
   APP_DISABLE_REGISTRATION,
@@ -39,12 +39,12 @@ export class DashboardController {
   favicon() {}
 
   @Get('/sign-up')
-  signUp(@Res() res: Response) {
+  signUp(@Req() req: Request, @Res() res: Response) {
     if (APP_DISABLE_REGISTRATION) {
       return res.redirect(302, '/login')
     }
 
-    return this.index(res)
+    return this.index(req, res)
   }
 
   @Get([
@@ -61,12 +61,17 @@ export class DashboardController {
     '/workspace/*'
   ])
   @Header('X-Frame-Options', 'SAMEORIGIN')
-  index(@Res() res: Response) {
+  index(@Req() req: Request, @Res() res: Response) {
     return res.render('index', {
       title: 'HeyForm Dashboard - Create and Manage Custom Forms Effortlessly',
       description:
         "Simplify your form creation process with HeyForm's intuitive dashboard. Design, customize, and manage forms all in one place, with no coding required.",
-      heyform: this.runtimeConfig()
+      // supporthub-fork: tenantReturnUrl is page-render-only (NOT in the shared
+      // runtimeConfig() / /api/config) — it powers the embedded "Back to tenant" button.
+      heyform: {
+        ...this.runtimeConfig(),
+        tenantReturnUrl: req.cookies?.HEYFORM_RETURN_URL
+      }
     })
   }
 }

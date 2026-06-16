@@ -1,6 +1,7 @@
 import { Content, Description, Overlay, Portal, Root, Title } from '@radix-ui/react-dialog'
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import {
+  IconArrowLeft,
   IconHome,
   IconLocation,
   IconPlus,
@@ -16,6 +17,7 @@ import { cn, useParam } from '@/utils'
 import { helper } from '@heyform-inc/utils'
 
 import { Button, Tooltip } from '@/components'
+import { getTenantReturnUrl, isSsoOnly } from '@/consts'
 import { useAppStore, useModal, useWorkspaceStore } from '@/store'
 
 import ChangelogButton from './ChangelogButton'
@@ -57,16 +59,40 @@ const WorkspaceSidebarComponent = () => {
   const { openModal } = useAppStore()
   const { workspace } = useWorkspaceStore()
 
+  // supporthub-fork: in embedded SSO-only mode the workspace-management chrome is
+  // replaced by a single "Back to tenant" full-page nav. Native heyform keeps the
+  // workspace switcher and all nav links exactly as before.
+  const ssoOnly = isSsoOnly()
+  const tenantReturnUrl = getTenantReturnUrl()
+
   return (
     <div className="hf-sidebar-surface max-lg:bg-background flex h-full flex-col max-lg:rounded-lg max-lg:border">
       <div className="p-4">
-        <WorkspaceSwitcher />
+        {ssoOnly ? (
+          helper.isValid(tenantReturnUrl) && (
+            <a
+              href={tenantReturnUrl}
+              className="hf-sidebar-link"
+              data-state="inactive"
+              title={t('workspace.backToTenant', { name: workspace?.name })}
+            >
+              <IconArrowLeft className="hf-sidebar-link-icon" data-slot="icon" />
+              <span className="truncate">
+                {t('workspace.backToTenant', { name: workspace?.name })}
+              </span>
+            </a>
+          )
+        ) : (
+          <WorkspaceSwitcher />
+        )}
       </div>
 
       <div className="scrollbar flex flex-1 flex-col p-4">
         <nav className="flex flex-col gap-y-1">
-          {/* Home */}
-          <Link to={`/workspace/${workspaceId}/`} icon={IconHome} label={t('dashboard.title')} />
+          {/* Home — workspace-level nav hidden in embedded SSO-only mode */}
+          {!ssoOnly && (
+            <Link to={`/workspace/${workspaceId}/`} icon={IconHome} label={t('dashboard.title')} />
+          )}
 
           {/* Search */}
           <button
@@ -78,14 +104,16 @@ const WorkspaceSidebarComponent = () => {
             <span className="truncate">{t('workspace.sidebar.search')}</span>
           </button>
 
-          {/* Members */}
-          <Link
-            to={`/workspace/${workspaceId}/members`}
-            icon={IconUsers}
-            label={t('members.title')}
-          />
+          {/* Members — hidden in embedded SSO-only mode */}
+          {!ssoOnly && (
+            <Link
+              to={`/workspace/${workspaceId}/members`}
+              icon={IconUsers}
+              label={t('members.title')}
+            />
+          )}
 
-          {workspace.isOwner && (
+          {!ssoOnly && workspace.isOwner && (
             <>
               {/* Settings */}
               <Link

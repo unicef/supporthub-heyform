@@ -11,7 +11,7 @@ import { helper, timestamp } from '@heyform-inc/utils'
 
 import Logo from '@/assets/logo.svg?react'
 import { Button, useAlert } from '@/components'
-import { REDIRECT_COOKIE_NAME } from '@/consts'
+import { REDIRECT_COOKIE_NAME, getTenantReturnUrl, isSsoOnly } from '@/consts'
 import { useAppStore, useUserStore, useWorkspaceStore } from '@/store'
 
 import { FormShell } from '../Form/FormShell'
@@ -121,6 +121,17 @@ export const WorkspaceGuard: FC<LayoutProps> = ({ options, children }) => {
     }
 
     if (helper.isEmpty(result)) {
+      // supporthub-fork: provision always creates a workspace, so empty here is an
+      // anomaly. Never strand the user on /workspace/create (unreachable in SSO-only);
+      // bounce back to the tenant if we know the URL, else fall through to noAccess.
+      if (isSsoOnly()) {
+        const tenantReturnUrl = getTenantReturnUrl()
+        if (helper.isValid(tenantReturnUrl)) {
+          window.location.href = tenantReturnUrl!
+        }
+        return
+      }
+
       return router.redirect('/workspace/create')
     }
 
