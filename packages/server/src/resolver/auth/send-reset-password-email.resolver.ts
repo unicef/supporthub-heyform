@@ -1,6 +1,7 @@
 import { BadRequestException, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 
+import { HEYFORM_SSO_ONLY } from '@environments'
 import { SendResetPasswordEmailInput } from '@graphql'
 import { DeviceIdGuard, GqlThrottlerGuard } from '@guard'
 import { helper, hs } from '@heyform-inc/utils'
@@ -27,6 +28,10 @@ export class SendResetPasswordEmailResolver {
   async sendResetPasswordEmail(
     @Args('input') input: SendResetPasswordEmailInput
   ): Promise<boolean> {
+    if (HEYFORM_SSO_ONLY) {
+      throw new BadRequestException('Native authentication is disabled')
+    }
+
     const user = await this.userService.findByEmail(input.email)
 
     if (helper.isEmpty(user)) {

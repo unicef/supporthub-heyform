@@ -65,6 +65,16 @@ export class RedisService {
     return this.redis.set(key, value, 'ex', hs(duration))
   }
 
+  /**
+   * Atomic SET key value NX EX <seconds>. Returns true if the key was newly set,
+   * false if it already existed (used by the SupportHub SSO endpoint to enforce
+   * single-use jti / replay protection).
+   */
+  public async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    const result = await this.redis.set(key, value, 'EX', ttlSeconds, 'NX')
+    return result === 'OK'
+  }
+
   public hset({ key, field, value, duration }: HsetOptions): Promise<[Error | null, any][]> {
     return this.multi([
       ['hset', key, field, value],

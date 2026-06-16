@@ -1,0 +1,66 @@
+# S1 + S2.0 spike stack for the SupportHub integration (supporthub-fork branch).
+# NOT the production compose — this is the risk-gate harness:
+#   - heyform on FerretDB (Postgres), zero MongoDB
+#   - exercises the thin provision + /sso endpoints (S2.0)
+# HEYFORM_SSO_ONLY is intentionally OFF here to avoid lockout during the gate.
+services:
+  ferretdb:
+    image: ghcr.io/ferretdb/ferretdb-eval:2
+    environment:
+      POSTGRES_PASSWORD: spikepass
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')",
+              "mongodb://postgres:spikepass@127.0.0.1:27017/?authMechanism=SCRAM-SHA-256&directConnection=true"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  heyform-redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "spikeredis"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "spikeredis", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  heyform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: heyform-supporthub-fork:local
+    depends_on:
+      ferretdb:
+        condition: service_healthy
+      heyform-redis:
+        condition: service_healthy
+    ports:
+      - "9157:9157"
+    environment:
+      NODE_ENV: development
+      APP_LISTEN_PORT: "9157"
+      APP_HOMEPAGE_URL: "http://localhost:9157"
+      # FerretDB: creds via MONGO_USER/MONGO_PASSWORD (driver negotiates SCRAM-SHA-256); directConnection in URI
+      MONGO_URI: "mongodb://ferretdb:27017/heyform?authMechanism=SCRAM-SHA-256&directConnection=true"
+      MONGO_USER: "postgres"
+      MONGO_PASSWORD: "spikepass"
+      REDIS_HOST: "heyform-redis"
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: "spikeredis"
+      REDIS_DB: "0"
+      # required-no-default secrets (dev-only literals)
+      SESSION_KEY: "spike-session-key-please-change-0001"
+      FORM_ENCRYPTION_KEY: "spike-form-encryption-key-change-0001"
+      # S2.0 handoff secret (shared with SupportHub side); HS256, >=32 bytes
+      HEYFORM_SSO_SECRET: "spike-heyform-sso-secret-32bytes-minimum-0001"
+      # SSO-only now ON: S2.0 gate passed, S2.4 enforcement implemented.
+      HEYFORM_SSO_ONLY: "1"
+      APP_DISABLE_REGISTRATION: "false"
+      VERIFY_USER_EMAIL: "false"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9157/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30

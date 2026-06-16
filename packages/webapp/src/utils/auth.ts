@@ -47,15 +47,20 @@ export function getDeviceId() {
   const storage = store.get(DEVICEID_COOKIE_NAME)
   const cookie = getCookie(DEVICEID_COOKIE_NAME)
 
-  if (helper.isValid(storage)) {
+  // SupportHub SSO trust order: the server-set HEYFORM_DEVICE_ID cookie is authoritative.
+  // On an SSO landing the /sso endpoint pins the heyform session to the cookie's deviceId,
+  // so a stale localStorage id from a prior session must NOT overwrite it (doing so makes
+  // every guarded GraphQL call 403 via AuthGuard's x-device-id check). Therefore: when a
+  // cookie is present, sync localStorage to it; only fall back to localStorage when no cookie.
+  if (helper.isValid(cookie)) {
     if (!helper.isEqual(storage, cookie)) {
-      setCookie(DEVICEID_COOKIE_NAME, storage)
+      store.set(DEVICEID_COOKIE_NAME, cookie)
     }
 
-    return storage
-  } else if (helper.isValid(cookie)) {
-    store.set(DEVICEID_COOKIE_NAME, cookie)
     return cookie
+  } else if (helper.isValid(storage)) {
+    setCookie(DEVICEID_COOKIE_NAME, storage)
+    return storage
   }
 }
 

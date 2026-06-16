@@ -8,6 +8,7 @@ import * as helmet from 'helmet'
 import { extname } from 'path'
 import * as serveStatic from 'serve-static'
 
+import { ssoOnlyChokePoint } from './common/middleware'
 import { corsOrigin } from '@config'
 import {
   APP_LISTEN_HOSTNAME,
@@ -29,6 +30,15 @@ async function bootstrap() {
 
   // Apollo Server 4 expects req.body to be populated before the GraphQL middleware runs.
   app.use('/graphql', bodyParser.json({ limit: '1mb' }))
+
+  // supporthub-fork: bodyParser is disabled globally, so the SupportHub provision
+  // endpoint needs its own JSON parser for the `{ token }` body.
+  app.use('/api/provision', bodyParser.json({ limit: '64kb' }))
+
+  // supporthub-fork: single enforced SSO-only choke point. Runs AFTER the body
+  // parsers (so it can read req.body.operationName / req.body.query on /graphql)
+  // and BEFORE Nest routing. No-op unless HEYFORM_SSO_ONLY is ON.
+  app.use(ssoOnlyChokePoint)
 
   // Verify all params
   app.useGlobalPipes(

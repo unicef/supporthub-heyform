@@ -1,6 +1,7 @@
 import { SocialLoginTypeEnum } from '@heyform-inc/shared-types-enums'
 import { Controller, Get, Param, Post, Query, Req, Res } from '@nestjs/common'
 
+import { HEYFORM_SSO_ONLY } from '@environments'
 import { helper } from '@heyform-inc/utils'
 import { AuthService, RedisService, SocialLoginService } from '@service'
 import { Logger } from '@utils'
@@ -21,6 +22,21 @@ export class SocialLoginController {
   }
 
   /**
+   * supporthub-fork defense-in-depth: the Express choke point already blocks
+   * /connect/* when SSO-only is ON. Reject here too, writing the response
+   * explicitly (REST routes don't reliably surface thrown HttpExceptions).
+   * Returns true when the request was rejected.
+   */
+  private rejectIfSsoOnly(res: any): boolean {
+    if (HEYFORM_SSO_ONLY) {
+      res.status(403).json({ statusCode: 403, message: 'Native authentication is disabled' })
+      return true
+    }
+
+    return false
+  }
+
+  /**
    * Sign With Apple will post the code to back server,
    * this value cannot be obtained in front end.
    * We have to use back end server to deal with the problem here,
@@ -36,6 +52,10 @@ export class SocialLoginController {
     @Req() req: any,
     @Res() res: any
   ) {
+    if (this.rejectIfSsoOnly(res)) {
+      return
+    }
+
     if (helper.isEmpty(query.state)) {
       return res.render('index', {
         payload: {
@@ -76,6 +96,10 @@ export class SocialLoginController {
     @Req() req: any,
     @Res() res: any
   ) {
+    if (this.rejectIfSsoOnly(res)) {
+      return
+    }
+
     await this.handleCallback(kind, query, req, res)
   }
 
@@ -85,6 +109,10 @@ export class SocialLoginController {
     @Req() req: any,
     @Res() res: any
   ) {
+    if (this.rejectIfSsoOnly(res)) {
+      return
+    }
+
     //!!! Sign With Apple will only post `code` and `state` to back-end server
     await this.handleCallback(kind, req.body, req, res)
   }

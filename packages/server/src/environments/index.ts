@@ -151,6 +151,12 @@ export const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 export const OPENAI_GPT_MODEL = process.env.OPENAI_GPT_MODEL || 'gpt-3.5-turbo-0125'
 
+// SupportHub SSO (fork-only)
+// HS256 handoff secret shared with SupportHub; provision/forms/sso JWTs are signed with it.
+export const HEYFORM_SSO_SECRET: string = process.env.HEYFORM_SSO_SECRET
+// When ON, native auth (login/signup/social/reset) is disabled — enforcement is deferred (see SUPPORTHUB_FORK_NOTES.md). Stays OFF for now.
+export const HEYFORM_SSO_ONLY: boolean = helper.isTrue(process.env.HEYFORM_SSO_ONLY)
+
 // S3
 export const S3_ENDPOINT = process.env.S3_ENDPOINT
 export const S3_REGION = process.env.S3_REGION

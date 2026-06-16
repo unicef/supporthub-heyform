@@ -1,6 +1,7 @@
 import { BadRequestException, UseGuards } from '@nestjs/common'
 
 import { GraphqlRequest, GraphqlResponse } from '@decorator'
+import { HEYFORM_SSO_ONLY } from '@environments'
 import { LoginInput } from '@graphql'
 import { DeviceIdGuard } from '@guard'
 import { date, helper } from '@heyform-inc/utils'
@@ -25,6 +26,10 @@ export class LoginResolver {
     @GraphqlResponse() res: any,
     @Args('input') input: LoginInput
   ): Promise<boolean> {
+    if (HEYFORM_SSO_ONLY) {
+      throw new BadRequestException('Native authentication is disabled')
+    }
+
     const user = await this.userService.findByEmail(input.email)
 
     if (helper.isEmpty(user)) {

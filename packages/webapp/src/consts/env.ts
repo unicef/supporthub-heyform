@@ -39,6 +39,12 @@ export function isRegistrationDisabled() {
   return helper.isTrue(window.heyform?.appDisableRegistration)
 }
 
+// supporthub-fork: when SSO-only is ON, hide the native auth SPA routes. This is
+// cosmetic; the server's Express choke point is the real enforcement.
+export function isSsoOnly() {
+  return helper.isTrue(window.heyform?.ssoOnly)
+}
+
 export function getVerifyEmailResendCooldownSeconds() {
   const value = Number(window.heyform?.verifyEmailResendCooldownSeconds)
   return Number.isFinite(value) && value > 0 ? value : 60

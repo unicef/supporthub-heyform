@@ -7,6 +7,7 @@ import {
   COOKIE_DOMAIN,
   ENABLE_GOOGLE_FONTS,
   GOOGLE_RECAPTCHA_KEY,
+  HEYFORM_SSO_ONLY,
   STRIPE_PUBLISHABLE_KEY,
   VERIFY_EMAIL_RESEND_COOLDOWN
 } from '@environments'
@@ -19,6 +20,7 @@ export class DashboardController {
       homepageURL: APP_HOMEPAGE_URL,
       websiteURL: APP_HOMEPAGE_URL,
       appDisableRegistration: APP_DISABLE_REGISTRATION,
+      ssoOnly: HEYFORM_SSO_ONLY,
       cookieDomain: COOKIE_DOMAIN,
       enableGoogleFonts: ENABLE_GOOGLE_FONTS,
       stripePublishableKey: STRIPE_PUBLISHABLE_KEY,

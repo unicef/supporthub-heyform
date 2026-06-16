@@ -1,6 +1,6 @@
 import { BadRequestException, UseGuards } from '@nestjs/common'
 
-import { BCRYPT_SALT } from '@environments'
+import { BCRYPT_SALT, HEYFORM_SSO_ONLY } from '@environments'
 import { ResetPasswordInput } from '@graphql'
 import { DeviceIdGuard } from '@guard'
 import { helper } from '@heyform-inc/utils'
@@ -23,6 +23,10 @@ export class ResetPasswordResolver {
     @GqlLang() lang: UserLangEnum,
     @Args('input') input: ResetPasswordInput
   ): Promise<boolean> {
+    if (HEYFORM_SSO_ONLY) {
+      throw new BadRequestException('Native authentication is disabled')
+    }
+
     const user = await this.userService.findByEmail(input.email)
 
     if (helper.isEmpty(user)) {

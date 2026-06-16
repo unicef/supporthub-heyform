@@ -1,7 +1,7 @@
 import { BadRequestException, UseGuards } from '@nestjs/common'
 
 import { GraphqlResponse } from '@decorator'
-import { APP_DISABLE_REGISTRATION, BCRYPT_SALT } from '@environments'
+import { APP_DISABLE_REGISTRATION, BCRYPT_SALT, HEYFORM_SSO_ONLY } from '@environments'
 import { SignUpInput } from '@graphql'
 import { DeviceIdGuard } from '@guard'
 import { helper } from '@heyform-inc/utils'
@@ -26,6 +26,10 @@ export class SignUpResolver {
     @GraphqlResponse() res: any,
     @Args('input') input: SignUpInput
   ): Promise<boolean> {
+    if (HEYFORM_SSO_ONLY) {
+      throw new BadRequestException('Native authentication is disabled')
+    }
+
     if (APP_DISABLE_REGISTRATION) {
       throw new BadRequestException('Error: Registration is disabled')
     }

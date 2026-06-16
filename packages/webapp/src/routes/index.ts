@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { Navigate } from 'react-router-dom'
 
-import { isRegistrationDisabled } from '@/consts'
+import { isRegistrationDisabled, isSsoOnly } from '@/consts'
 import { AuthLayout, BaseLayout, WorkspaceGuard, WorkspaceLayout } from '@/layouts'
 import ForgotPassword from '@/pages/auth/ForgotPassword'
 import Login from '@/pages/auth/Login'
@@ -221,4 +221,13 @@ const routes = [
   }
 ]
 
-export default routes
+// supporthub-fork: when SSO-only is ON, hide the native auth routes from the SPA.
+// The native sign-in happens through SupportHub; the server choke point is the
+// real guarantee, this just keeps the dead pages out of the router.
+const SSO_HIDDEN_PATHS = new Set(['/login', '/sign-up', '/forgot-password', '/reset-password'])
+
+const visibleRoutes = isSsoOnly()
+  ? routes.filter(route => !SSO_HIDDEN_PATHS.has(route.path))
+  : routes
+
+export default visibleRoutes

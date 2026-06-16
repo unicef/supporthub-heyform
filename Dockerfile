@@ -35,7 +35,9 @@ COPY pnpm-lock.yaml $APP_PATH/pnpm-lock.yaml
 COPY packages/server/package.json $APP_PATH/packages/server/package.json
 
 RUN printf "packages:\n  - 'packages/server'\n" > $APP_PATH/pnpm-workspace.yaml
-RUN pnpm install --prod --frozen-lockfile --filter ./packages/server...
+# supporthub-fork: drop --frozen-lockfile; upstream's committed lockfile has an
+# overrides mismatch at this checkout that aborts a frozen install.
+RUN pnpm install --prod --no-frozen-lockfile --filter ./packages/server...
 
 COPY --from=base $APP_PATH/packages/server/dist $APP_PATH/packages/server/dist
 COPY --from=base $APP_PATH/packages/server/resources $APP_PATH/packages/server/resources
