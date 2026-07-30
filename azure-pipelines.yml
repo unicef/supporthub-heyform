@@ -1,0 +1,54 @@
+# Builds the SupportHub heyform fork and publishes it to the UNICEF ACR.
+#
+# Exists because the dev deployment (supporthub_ops PR #95) pins
+# `unicrsdsupporthub.azurecr.io/supporthub-heyform`, and nothing was publishing
+# that repository — the only CI here is upstream's GitHub Actions, which push
+# to upstream registries. Mirrors `unicef/supporthub`'s azure-pipelines.yml so
+# the two behave the same; no Sentry build-arg/secret, which is app-specific.
+#
+# The image builds from the repo root with the default Dockerfile and no build
+# args, matching both this repo's docker-compose.supporthub-spike.yml and the
+# compose recipe in supporthub-v2's docker-compose.full.yaml
+# (`build: { context: repos/heyform }`).
+#
+# Pin deploys to the immutable `$(Build.SourceVersion)` tag.
+trigger:
+  branches:
+    include:
+      - "supporthub-fork"
+  tags:
+    include:
+      - "*"
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - bash: |
+      PR_NUM=$(System.PullRequest.PullRequestNumber)
+      if [[ -n "${PR_NUM}" ]]
+      then
+        echo "Pull request ${PR_NUM}"
+        echo "##vso[task.setvariable variable=dockerTag]pr-${PR_NUM}"
+      else
+        echo "Branch or tag $(Build.SourceBranchName)"
+        echo "##vso[task.setvariable variable=dockerTag]$(Build.SourceBranchName)"
+      fi
+    displayName: Generate docker tag name
+    name: TagName
+  - task: Docker@2
+    displayName: Build supporthub-heyform image
+    inputs:
+      containerRegistry: "unicrsdsupporthub"
+      repository: "supporthub-heyform"
+      command: "build"
+      Dockerfile: "Dockerfile"
+      buildContext: "$(Build.SourcesDirectory)"
+      tags: "$(dockerTag),$(Build.SourceVersion),$(Build.SourceBranchName)_$(Build.SourceVersion)_$(Build.BuildNumber)"
+  - task: Docker@2
+    displayName: push supporthub-heyform image to container registry
+    inputs:
+      containerRegistry: "unicrsdsupporthub"
+      repository: "supporthub-heyform"
+      command: "push"
+      tags: "$(dockerTag),$(Build.SourceVersion),$(Build.SourceBranchName)_$(Build.SourceVersion)_$(Build.BuildNumber)"
