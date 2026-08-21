@@ -12,6 +12,10 @@ import type {
 } from './enums/form'
 
 export interface FormSettings {
+  // supporthub-fork: surfaced on the PUBLIC form only, and derived from the
+  // owning team's `removeBranding` flag by the `publicForm` resolver — it is
+  // NOT persisted on the form document. See form-detail.resolver.ts.
+  removeBranding?: boolean
   captchaKind?: CaptchaKindEnum
   active?: boolean
   enableExpirationDate?: boolean

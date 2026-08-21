@@ -991,6 +991,10 @@ export class FormSettingType {
 
   @Field({ nullable: true })
   enableEmailNotification?: boolean
+
+  // supporthub-fork: resolved from the owning team, not stored on the form.
+  @Field({ nullable: true })
+  removeBranding?: boolean
 }
 
 @ObjectType()
