@@ -3,7 +3,7 @@ import { FormDetailInput, FormType, PublicFormType } from '@graphql'
 import { date, helper } from '@heyform-inc/utils'
 import { FormModel, TeamModel } from '@model'
 import { Args, Query, Resolver } from '@nestjs/graphql'
-import { FormService, SubmissionService } from '@service'
+import { FormService, SubmissionService, TeamService } from '@service'
 
 const DEFAULT_FORM_NAME = 'Untitled'
 
@@ -40,9 +40,24 @@ export class FormDetailResolver {
   }
 }
 
+/**
+ * supporthub-fork: `removeBranding` is a TEAM flag (see team.model.ts), but the
+ * form renderer reads it off the form's `settings` (`Branding.tsx` bails on
+ * `state.settings?.removeBranding`). Nothing bridged the two, so flipping the
+ * workspace toggle had no effect on a public form.
+ *
+ * It is resolved HERE rather than in `FormService.findPublicForm` because that
+ * method has three return paths — the active form plus two "closed" stubs — and
+ * every one of them rebuilds `settings` through an explicit `pickObject`
+ * allowlist. Injecting the flag in the resolver covers all three in one place,
+ * and the closed-form view renders the badge too.
+ */
 @Resolver()
 export class PublicFormResolver {
-  constructor(private readonly formService: FormService) {}
+  constructor(
+    private readonly formService: FormService,
+    private readonly teamService: TeamService
+  ) {}
 
   @Query(returns => PublicFormType)
   async publicForm(@Args('input') input: FormDetailInput): Promise<PublicFormType> {
@@ -59,6 +74,11 @@ export class PublicFormResolver {
     if (!form.projectId) {
       throw new Error('Form projectId is required')
     }
+
+    // Team lookup is by id on an already-validated `teamId`, so this adds one
+    // indexed read to the public form path and cannot fail the render: a
+    // missing team degrades to "badge shown", never to an error.
+    const team = await this.teamService.findById(form.teamId)
 
     const integrations: Record<string, any> = {}
 
@@ -83,7 +103,10 @@ export class PublicFormResolver {
       description: form.description,
       interactiveMode: form.interactiveMode,
       kind: form.kind,
-      settings: form.settings,
+      settings: {
+        ...form.settings,
+        removeBranding: team?.removeBranding === true
+      },
       drafts: form.drafts || form.fields || [],
       fields: form.fields || [],
       translations: form.translations || {},

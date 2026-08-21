@@ -171,7 +171,11 @@ export class SupporthubController {
         teamId = await this.teamService.create({
           ownerId,
           name: claims.tenantName,
-          storageQuota: 0
+          storageQuota: 0,
+          // Embedded in a tenant's own site, so the "Made with HeyForm" badge
+          // is off by default rather than something an admin has to find and
+          // switch off per workspace.
+          removeBranding: true
         })
         // Owner membership: role pinned to ADMIN server-side (never from JWT).
         await this.teamService.createMember({
