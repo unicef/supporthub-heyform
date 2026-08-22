@@ -105,7 +105,15 @@ export class PublicFormResolver {
       kind: form.kind,
       settings: {
         ...form.settings,
-        removeBranding: team?.removeBranding === true
+        // Default ON when the flag is unset. These forms are always embedded in
+        // a tenant's own site, so the badge showing is the wrong default — and
+        // the per-workspace toggle is effectively unreachable here: it is
+        // owner-gated (`update-team.resolver.ts` throws unless
+        // `team.ownerId === user.id`), the owner is whichever admin happened to
+        // be first in the provision claims, and the sidebar link is hidden in
+        // SSO-only mode. An explicit `false` is still honoured, so a tenant
+        // that genuinely wants the badge can have it.
+        removeBranding: team?.removeBranding !== false
       },
       drafts: form.drafts || form.fields || [],
       fields: form.fields || [],
