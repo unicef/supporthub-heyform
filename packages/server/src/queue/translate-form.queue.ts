@@ -3,7 +3,8 @@ import { Process, Processor } from '@nestjs/bull'
 import { Job } from 'bull'
 import { OpenAI } from 'openai'
 
-import { OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_GPT_MODEL } from '@environments'
+import { OPENAI_GPT_MODEL } from '@environments'
+import { openAIClientOptions } from '../service/open-ai.service'
 import { htmlUtils } from '@heyform-inc/answer-utils'
 import { helper } from '@heyform-inc/utils'
 import { FormService } from '@service'
@@ -72,10 +73,7 @@ export class TranslateFormQueue extends BaseQueue {
     })
 
     if (helper.isValid(translations)) {
-      const openai = new OpenAI({
-        apiKey: OPENAI_API_KEY,
-        baseURL: OPENAI_BASE_URL
-      })
+      const openai = new OpenAI(openAIClientOptions())
 
       const { choices } = await openai.chat.completions.create({
         model: OPENAI_GPT_MODEL,
