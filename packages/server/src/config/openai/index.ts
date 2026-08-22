@@ -17,6 +17,42 @@ Field JSON shape:
   "properties": {},
   "layout": null
 }
+
+REQUIRED properties per kind. A field of these kinds is INVALID with empty
+properties — emit the keys shown, with real values, never placeholders:
+
+- multiple_choice, picture_choice:
+  "properties": {
+    "allowMultiple": false,
+    "verticalAlignment": true,
+    "choices": [
+      { "id": "12-character id", "label": "A real option" },
+      { "id": "12-character id", "label": "Another real option" }
+    ]
+  }
+  Give at least two choices. Every label must be non-empty.
+
+- yes_no:
+  "properties": { "choices": [
+    { "id": "12-character id", "label": "Yes" },
+    { "id": "12-character id", "label": "No" }
+  ] }
+
+- rating:        "properties": { "total": 5, "shape": "star" }
+- opinion_scale: "properties": { "total": 10 }
+- date, date_range: "properties": { "format": "MM/DD/YYYY", "allowTime": false }
+- phone_number: "properties": { "defaultCountryCode": "US" }
+- payment:      "properties": { "currency": "USD", "price": { "type": "number", "value": 0 } }
+- input_table:
+  "properties": { "tableColumns": [
+    { "id": "12-character id", "label": "A real column" },
+    { "id": "12-character id", "label": "Another real column" }
+  ] }
+  Every column label must be non-empty.
+
+All other kinds take "properties": {}.
+
+Every "id" must be a distinct 12-character alphanumeric string.
 `
 
 const LOGIC_INTERFACES = `
