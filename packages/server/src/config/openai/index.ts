@@ -18,39 +18,45 @@ Field JSON shape:
   "layout": null
 }
 
-REQUIRED properties per kind. A field of these kinds is INVALID with empty
-properties — emit the keys shown, with real values, never placeholders:
+"validations" ACCEPTS ONLY THESE FOUR KEYS. Any other key is rejected:
+  required (boolean), min (number), max (number), matchExpected (boolean)
+There is no format, max_length, min_length, pattern or email/url validation key.
+Use "email" or "url" as the field KIND instead, and min/max for length limits.
+
+"properties" ACCEPTS ONLY THESE KEYS. Any other key is rejected:
+  showButton, buttonText, hideMarks, allowOther, allowMultiple, badge,
+  verticalAlignment, choices, randomize, choiceStyle, other, numberPreRow,
+  shape, total, start, leftLabel, centerLabel, rightLabel, defaultCountryCode,
+  currency, price, format, allowTime, use12Hours, tableColumns, score,
+  sourceUrl, buttonLinkUrl, redirectUrl, redirectOnCompletion, redirectDelay
+There is no allowed_file_types, max_files or any other key. All keys are
+camelCase — never snake_case.
+
+"choices" and "tableColumns" are arrays of OBJECTS, never of strings:
+  "choices": [{ "id": "12-character id", "label": "Low" }]
+  NOT "choices": ["Low"]
+
+Required properties per kind. These kinds are INVALID with empty properties:
 
 - multiple_choice, picture_choice:
-  "properties": {
-    "allowMultiple": false,
-    "verticalAlignment": true,
-    "choices": [
-      { "id": "12-character id", "label": "A real option" },
-      { "id": "12-character id", "label": "Another real option" }
-    ]
-  }
-  Give at least two choices. Every label must be non-empty.
-
+  { "allowMultiple": false, "verticalAlignment": true,
+    "choices": [ { "id": "12-character id", "label": "A real option" },
+                 { "id": "12-character id", "label": "Another real option" } ] }
+  At least two choices; every label non-empty.
 - yes_no:
-  "properties": { "choices": [
-    { "id": "12-character id", "label": "Yes" },
-    { "id": "12-character id", "label": "No" }
-  ] }
-
-- rating:        "properties": { "total": 5, "shape": "star" }
-- opinion_scale: "properties": { "total": 10 }
-- date, date_range: "properties": { "format": "MM/DD/YYYY", "allowTime": false }
-- phone_number: "properties": { "defaultCountryCode": "US" }
-- payment:      "properties": { "currency": "USD", "price": { "type": "number", "value": 0 } }
+  { "choices": [ { "id": "12-character id", "label": "Yes" },
+                 { "id": "12-character id", "label": "No" } ] }
+- rating:        { "total": 5, "shape": "star" }
+- opinion_scale: { "total": 10 }
+- date, date_range: { "format": "MM/DD/YYYY", "allowTime": false }
+- phone_number:  { "defaultCountryCode": "US" }
+- payment:       { "currency": "USD", "price": { "type": "number", "value": 0 } }
 - input_table:
-  "properties": { "tableColumns": [
-    { "id": "12-character id", "label": "A real column" },
-    { "id": "12-character id", "label": "Another real column" }
-  ] }
-  Every column label must be non-empty.
+  { "tableColumns": [ { "id": "12-character id", "label": "A real column" },
+                      { "id": "12-character id", "label": "Another real column" } ] }
 
-All other kinds take "properties": {}.
+All other kinds take "properties": {}. file_upload takes {} — it has no
+configurable properties.
 
 Every "id" must be a distinct 12-character alphanumeric string.
 `
