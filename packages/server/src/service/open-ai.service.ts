@@ -50,12 +50,17 @@ export class OpenAIService {
   }
 
   async chatCompletion(request: ChatCompletionRequest) {
+    // Sampling params are omitted on a gateway deployment: the gpt-5 family
+    // rejects non-default temperature / top_p / penalties outright, and the
+    // deployment owns its own defaults. SupportHub's own client sends none of
+    // them for the same reason.
+    const sampling = helper.isEmpty(OPENAI_API_VERSION)
+      ? { temperature: 0, top_p: 1, frequency_penalty: 1, presence_penalty: 1 }
+      : {}
+
     return this.getClient().chat.completions.create({
       model: OPENAI_GPT_MODEL,
-      temperature: 0,
-      top_p: 1,
-      frequency_penalty: 1,
-      presence_penalty: 1,
+      ...sampling,
       stream: false,
       ...request
     })
