@@ -150,6 +150,10 @@ export const UNSPLASH_CLIENT_ID: string = process.env.UNSPLASH_CLIENT_ID
 export const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 export const OPENAI_GPT_MODEL = process.env.OPENAI_GPT_MODEL || 'gpt-3.5-turbo-0125'
+// Set for Azure AI Model Inference / APIM gateways, which require an
+// `api-version` query param and authenticate with an `api-key` header rather
+// than a bearer token. Unset = plain OpenAI.
+export const OPENAI_API_VERSION = process.env.OPENAI_API_VERSION
 
 // SupportHub SSO (fork-only)
 // HS256 handoff secret shared with SupportHub; provision/forms/sso JWTs are signed with it.

@@ -4,7 +4,7 @@ import {
   FormStatusEnum,
   InteractiveModeEnum
 } from '@heyform-inc/shared-types-enums'
-import { BadRequestException, InternalServerErrorException, UseGuards } from '@nestjs/common'
+import { InternalServerErrorException, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 
 import {
@@ -32,14 +32,7 @@ interface AIFormResult {
   fields?: unknown[]
 }
 
-interface TeamPlan {
-  aiForm?: boolean
-  themeCustomization?: boolean
-}
 
-type TeamWithPlan = TeamModel & {
-  plan?: TeamPlan
-}
 
 @Resolver()
 @Auth()
@@ -65,9 +58,6 @@ export class AIResolver {
     @User() user: UserModel,
     @Args('input') input: CreateFormWithAIInput
   ): Promise<string> {
-    if (!this.getPlan(team).aiForm) {
-      throw new BadRequestException('Upgrade your plan to create form with AI')
-    }
 
     const json = await this.createAIJson<AIFormResult>(
       createFormPrompt(input.topic, input.reference),
@@ -112,9 +102,6 @@ export class AIResolver {
     @Form() form: FormModel,
     @Args('input') input: CreateFieldsWithAIInput
   ): Promise<Record<string, unknown>[]> {
-    if (!this.getPlan(team).aiForm) {
-      throw new BadRequestException('Upgrade your plan to edit form with AI')
-    }
 
     const fields = await this.createAIJson<Record<string, unknown>[]>(
       createFieldsPrompt(form.name, parseJson(form._drafts), input.prompt),
@@ -135,9 +122,6 @@ export class AIResolver {
     @Form() form: FormModel,
     @Args('input') input: CreateFieldsWithAIInput
   ): Promise<Record<string, unknown>[]> {
-    if (!this.getPlan(team).aiForm) {
-      throw new BadRequestException('Upgrade your plan to setup logics with AI')
-    }
 
     const logics = await this.createAIJson<Record<string, unknown>[]>(
       createLogicsPrompt(parseJson(form._drafts), form.logics, input.prompt),
@@ -157,16 +141,6 @@ export class AIResolver {
     @Team() team: TeamModel,
     @Args('input') input: CreateFormThemeWithAIInput
   ): Promise<Record<string, unknown>> {
-    const plan = this.getPlan(team)
-
-    if (!plan.themeCustomization) {
-      throw new BadRequestException('Upgrade your plan to setup theme customization')
-    }
-
-    if (!plan.aiForm) {
-      throw new BadRequestException('Upgrade your plan to setup theme with AI')
-    }
-
     const theme = await this.createAIJson<Record<string, unknown>>(
       createThemePrompt(input.theme, input.prompt),
       'Failed to create theme'
@@ -179,9 +153,6 @@ export class AIResolver {
     return theme
   }
 
-  private getPlan(team: TeamModel): TeamPlan {
-    return (team as TeamWithPlan).plan || {}
-  }
 
   private async createAIJson<T>(prompt: string, errorMessage: string): Promise<T> {
     const result = await this.openAIService.chatCompletion({

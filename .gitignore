@@ -37,3 +37,4 @@ packages/server/static
 *.tsbuildinfo
 /.claude
 assets/*-e2e-*.png
+.gstack/
