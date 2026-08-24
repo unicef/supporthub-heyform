@@ -163,9 +163,21 @@ export class AIResolver {
         }
       ]
     })
-    const content = result.choices[0]?.message?.content
+    const choice = result.choices[0]
+    const content = choice?.message?.content
 
     this.logger.info(content)
+
+    // A completion cut off at `max_completion_tokens` returns valid-looking but
+    // truncated JSON, which would otherwise fail in `parseAIJson` as an
+    // indistinguishable "bad model output". Logged separately because the fix is
+    // a different one: raise the ceiling, or ask for fewer fields.
+    if (choice?.finish_reason === 'length') {
+      this.logger.error(
+        `AI completion truncated at max_completion_tokens; ${errorMessage.toLowerCase()}`
+      )
+      throw new InternalServerErrorException(errorMessage)
+    }
 
     if (helper.isEmpty(content)) {
       throw new InternalServerErrorException(errorMessage)

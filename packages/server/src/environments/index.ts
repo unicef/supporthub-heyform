@@ -154,6 +154,32 @@ export const OPENAI_GPT_MODEL = process.env.OPENAI_GPT_MODEL || 'gpt-3.5-turbo-0
 // `api-version` query param and authenticate with an `api-key` header rather
 // than a bearer token. Unset = plain OpenAI.
 export const OPENAI_API_VERSION = process.env.OPENAI_API_VERSION
+// Both of the next two default to ON for a gateway (where the deployment is
+// ours and known to be a gpt-5) and OFF otherwise, so a plain-OpenAI or
+// OpenAI-compatible backend keeps sending exactly the body it sent before —
+// neither param is old enough to assume every such backend accepts it.
+//
+// Reasoning models (the gpt-5 family, o-series) spend most of their wall-clock
+// on hidden reasoning tokens. Form generation is schema-filling, not hard
+// reasoning, so a low effort cuts time-to-completion a long way for no useful
+// loss. `none` omits the param — set it if a gateway ever fronts a
+// non-reasoning deployment, which would reject it.
+export const OPENAI_REASONING_EFFORT: string =
+  process.env.OPENAI_REASONING_EFFORT ||
+  (helper.isEmpty(process.env.OPENAI_API_VERSION) ? 'none' : 'low')
+// Ceiling on one completion so a runaway generation cannot sit on the
+// connection until something upstream kills it. Counts reasoning tokens as well
+// as visible output on a reasoning model, so leave headroom: too low truncates
+// the JSON and the parse fails (see `ai.resolver.ts`). 0 omits the param.
+export const OPENAI_MAX_COMPLETION_TOKENS: number =
+  +process.env.OPENAI_MAX_COMPLETION_TOKENS ||
+  (helper.isEmpty(process.env.OPENAI_API_VERSION) ? 0 : 8000)
+// Budget for one user-facing completion. Must stay UNDER the timeouts in front
+// of it — the webapp's Apollo link (110s) and the ingress
+// (`appgw.ingress.kubernetes.io/request-timeout`, 120s on dev) — so a slow
+// gateway surfaces as our own error rather than an abandoned request that is
+// still being paid for. See `open-ai.service.ts`.
+export const OPENAI_REQUEST_TIMEOUT_MS: number = +process.env.OPENAI_REQUEST_TIMEOUT_MS || 100_000
 
 // SupportHub SSO (fork-only)
 // HS256 handoff secret shared with SupportHub; provision/forms/sso JWTs are signed with it.
