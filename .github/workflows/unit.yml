@@ -1,0 +1,60 @@
+# Server unit tests.
+#
+# Its own workflow rather than a step added to `server-e2e.yml`, because that one
+# filters on `branches: [next, main]` and so has never fired on a fork PR — a
+# step added there would not have run. The check that actually gates PRs on this
+# fork is the Azure `unicef.supporthub-heyform` pipeline, which is docker-build
+# only and has no Node step. See unicef/supporthub#362.
+#
+# Deliberately cheap: no services, no Docker, no build. The e2e suite stays where
+# it is; widening its branch filter to cover the fork is a separate decision.
+name: Unit tests
+
+on:
+  push:
+    branches: [supporthub-fork]
+  pull_request:
+    branches: [supporthub-fork]
+  workflow_dispatch:
+
+concurrency:
+  group: unit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: server unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check server
+        run: pnpm --filter ./packages/server type-check
+
+      # `oauth-state`, `permission.guard` and `update-form.resolver` reach the
+      # `@utils` barrel, which pulls `bcrypt`. Its binding comes from a
+      # postinstall script, so a cached store that predates it leaves the tests
+      # failing on a missing native module rather than on anything real. Cheap
+      # insurance, and it is a no-op when the binding is already there.
+      - name: Ensure native bindings
+        run: pnpm rebuild -r bcrypt
+
+      - name: Server unit tests
+        run: pnpm --filter ./packages/server test:unit
