@@ -10,7 +10,7 @@ import {
   Variable
 } from '@heyform-inc/shared-types-enums'
 
-import { apollo } from '@/utils'
+import { AI_REQUEST_TIMEOUT_MS, apollo } from '@/utils'
 
 import {
   COMPLETE_SUBMISSION_GQL,
@@ -100,9 +100,13 @@ export class FormService {
     })
   }
 
+  // The four AI mutations each wait on a model completion, so they carry
+  // AI_REQUEST_TIMEOUT_MS rather than the 30s default that stopped form
+  // generation finishing at all.
   static createWithAI(input: { projectId: string; topic: string; reference?: string }) {
     return apollo.mutate({
       mutation: CREATE_FORM_WITH_AI_GQL,
+      context: { timeout: AI_REQUEST_TIMEOUT_MS },
       variables: {
         input
       }
@@ -112,6 +116,7 @@ export class FormService {
   static createFieldsWithAI(formId: string, prompt: string) {
     return apollo.mutate({
       mutation: CREATE_FIELDS_WITH_AI_GQL,
+      context: { timeout: AI_REQUEST_TIMEOUT_MS },
       variables: {
         input: {
           formId,
@@ -124,6 +129,7 @@ export class FormService {
   static createLogicsWithAI(formId: string, prompt: string) {
     return apollo.mutate({
       mutation: CREATE_FORM_LOGICS_WITH_AI_GQL,
+      context: { timeout: AI_REQUEST_TIMEOUT_MS },
       variables: {
         input: {
           formId,
@@ -136,6 +142,7 @@ export class FormService {
   static createThemesWithAI(formId: string, prompt: string, theme: string) {
     return apollo.mutate({
       mutation: CREATE_FORM_THEME_WITH_AI_GQL,
+      context: { timeout: AI_REQUEST_TIMEOUT_MS },
       variables: {
         input: {
           formId,

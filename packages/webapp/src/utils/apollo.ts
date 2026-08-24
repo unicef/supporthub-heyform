@@ -48,7 +48,27 @@ const retryLink: any = new RetryLink({
   }
 })
 
+/**
+ * Default per-request ceiling, and the origin of the "Timeout exceeded" error.
+ * Deliberately short: an ordinary query that has not answered in 30s is not
+ * going to, and failing fast beats a spinner.
+ */
 const timeoutLink = new ApolloLinkTimeout(30_000)
+
+/**
+ * AI generation is the one operation here that legitimately runs past 30s — a
+ * reasoning model emitting a 5–20 field form does not finish inside it, and that
+ * ceiling is what surfaced as "Timeout exceeded" on dev. `apollo-link-timeout`
+ * reads `context.timeout` per operation, so the AI mutations opt into a longer
+ * budget without slowing the failure of everything else down.
+ *
+ * Sits between the server's own per-completion budget
+ * (`OPENAI_REQUEST_TIMEOUT_MS`, 100s) and the ingress
+ * (`appgw.ingress.kubernetes.io/request-timeout`, 120s on dev), so the innermost
+ * layer fails first and the user sees a real error rather than a gateway 504.
+ * Raising this without raising the ingress annotation achieves nothing.
+ */
+export const AI_REQUEST_TIMEOUT_MS = 110_000
 
 function getLocale() {
   return document.cookie

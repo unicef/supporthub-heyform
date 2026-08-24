@@ -102,6 +102,24 @@ Keep `HEYFORM_SSO_ONLY` **off** until the SSO round-trip is verified, then flip 
 | `HEYFORM_SSO_SECRET` | Shared HS256 secret for the handoff JWTs (≥32 bytes).          |
 | `HEYFORM_SSO_ONLY`   | Truthy → block native auth; only the `/sso` handoff signs in.  |
 | `MONGO_URI`/`MONGO_USER`/`MONGO_PASSWORD` | Point at FerretDB (see Database above).   |
+| `OPENAI_API_VERSION` | Set → talk to an Azure Model Inference / APIM gateway (`api-key` header + `api-version` param). Unset → plain OpenAI. |
+| `OPENAI_REASONING_EFFORT` | `minimal`/`low`/`medium`/`high`, or `none` to omit the param. Defaults to `low` on the gateway path, `none` otherwise. |
+| `OPENAI_MAX_COMPLETION_TOKENS` | Ceiling on one completion, reasoning tokens included. Defaults to 8000 on the gateway path, `0` (omitted) otherwise. |
+| `OPENAI_REQUEST_TIMEOUT_MS` | Budget for one user-facing completion. Default 100000. |
+
+### AI request timeouts
+
+Form generation waits on a whole completion, so three ceilings are stacked and
+the innermost must be the smallest, or the user gets someone else's error page:
+
+| Layer | Where | Dev value |
+|-------|-------|-----------|
+| Completion | `OPENAI_REQUEST_TIMEOUT_MS` (`open-ai.service.ts`, per-request, no retries) | 100s |
+| Browser | `AI_REQUEST_TIMEOUT_MS` (`webapp/src/utils/apollo.ts`, per-operation) | 110s |
+| Ingress | `appgw.ingress.kubernetes.io/request-timeout` in `supporthub_ops` | 120s |
+
+Raising one alone does nothing — the next one down still cuts the request. The
+default Apollo ceiling stays at 30s for every non-AI operation.
 
 `docker-compose.supporthub-spike.yml` boots heyform + FerretDB + Redis standalone for testing
 the fork in isolation.
