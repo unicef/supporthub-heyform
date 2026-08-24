@@ -274,6 +274,93 @@ function testReportsWhatItRepaired() {
   )
 }
 
+// ── kind aliases and layout blocks (unicef/supporthub#363) ─────────────────
+
+function testMapsSingleChoiceToMultipleChoicePickOne() {
+  const out = only([
+    field({ kind: 'single_choice', properties: { choices: ['Yes, always', 'Sometimes', 'Never'] } })
+  ])
+  assert.strictEqual(out.kind, 'multiple_choice')
+  assert.strictEqual(out.properties.allowMultiple, false)
+  assert.strictEqual(out.properties.choices.length, 3)
+}
+
+function testForcesPickOneEvenWhenTheInputClaimsOtherwise() {
+  // A single_choice asserting allowMultiple is contradicting its own name.
+  const out = only([
+    field({
+      kind: 'single_choice',
+      properties: { allowMultiple: true, choices: ['A', 'B'] }
+    })
+  ])
+  assert.strictEqual(out.properties.allowMultiple, false)
+}
+
+function testMapsParagraphToLongText() {
+  const out = only([field({ kind: 'paragraph' })])
+  assert.strictEqual(out.kind, 'long_text')
+}
+
+function testMapsDropdownToMultipleChoiceWithoutInventingChoiceStyle() {
+  const out = only([field({ kind: 'dropdown', properties: { choices: ['A', 'B'] } })])
+  assert.strictEqual(out.kind, 'multiple_choice')
+  assert.strictEqual(out.properties.allowMultiple, false)
+  // choiceStyle has no documented value in this repo; inventing one is the bug
+  // this module exists to prevent.
+  assert.ok(!('choiceStyle' in out.properties), 'must not invent a choiceStyle')
+}
+
+function testDropsLayoutBlocks() {
+  const { fields, repairs } = sanitizeAIFields([
+    field({ title: ['Real question'] }),
+    { id: 'layoutBlock1', kind: 'text' },
+    { id: 'layoutBlock2', kind: 'separator' },
+    { id: 'layoutBlock3', kind: 'page_break' }
+  ])
+  assert.strictEqual(fields.length, 1)
+  assert.strictEqual(fields[0].title[0], 'Real question')
+  // Reported as layout, not as "no usable title" — the distinction is what tells
+  // a reader whether anything was actually lost.
+  for (const kind of ['text', 'separator', 'page_break']) {
+    assert.ok(
+      repairs.some(r => r.includes(`dropped "${kind}" layout block`)),
+      `expected a layout repair for ${kind}, got: ${JSON.stringify(repairs)}`
+    )
+  }
+  assert.ok(!repairs.some(r => r.includes('no usable title')))
+}
+
+function testAliasReportedAsMappingNotAsUnknownKind() {
+  const { repairs } = sanitizeAIFields([field({ kind: 'paragraph' })])
+  assert.ok(repairs.some(r => r.includes('mapped kind "paragraph" to "long_text"')))
+  assert.ok(
+    !repairs.some(r => r.includes('unknown kind')),
+    'a known alias must not be reported as an unknown kind'
+  )
+}
+
+function testStillFallsBackForGenuinelyUnknownKinds() {
+  // The alias map must not swallow the fallback — an unrecognised kind still
+  // has to be reported as unknown so drift stays visible.
+  const { repairs } = sanitizeAIFields([field({ kind: 'carrier_pigeon' })])
+  assert.ok(repairs.some(r => r.includes('unknown kind')))
+}
+
+function testExplicitNullsAreDroppedSilently() {
+  // A null key means "not set". Reporting it as a repair would bury the repairs
+  // that matter — the template gallery ships 1,244 fields of all-null defaults.
+  const { fields, repairs } = sanitizeAIFields([
+    field({
+      kind: 'short_text',
+      validations: { required: true, min: null, max: null, matchExpected: null },
+      properties: { showButton: null, buttonText: null, price: null, currency: null }
+    })
+  ])
+  assert.deepStrictEqual(fields[0].validations, { required: true })
+  assert.deepStrictEqual(fields[0].properties, {})
+  assert.deepStrictEqual(repairs, [], `nulls must be silent, got: ${JSON.stringify(repairs)}`)
+}
+
 function run() {
   testDropsUnknownValidationKeys()
   testDropsUnknownPropertyKeys()
@@ -296,6 +383,14 @@ function run() {
   testSanitisesNestedGroupChildren()
   testReportsNoRepairsForCompliantOutput()
   testReportsWhatItRepaired()
+  testMapsSingleChoiceToMultipleChoicePickOne()
+  testForcesPickOneEvenWhenTheInputClaimsOtherwise()
+  testMapsParagraphToLongText()
+  testMapsDropdownToMultipleChoiceWithoutInventingChoiceStyle()
+  testDropsLayoutBlocks()
+  testAliasReportedAsMappingNotAsUnknownKind()
+  testStillFallsBackForGenuinelyUnknownKinds()
+  testExplicitNullsAreDroppedSilently()
 }
 
 if (require.main === module) {
