@@ -79,6 +79,39 @@ const PRICE_KEYS = new Set(['type', 'value', 'ref'])
 
 const FIELD_KINDS = new Set<string>(Object.values(FieldKindEnum))
 
+/**
+ * Names other form products use for kinds we do have. Without these the
+ * `short_text` fallback turns a dropdown into a text box — a silent downgrade
+ * that looks like the model's fault. These three are what a model reaches for
+ * when it is not following our prompt closely, and they are also 299 of the
+ * fields in HeyForm's own template gallery. See unicef/supporthub#363.
+ *
+ * `dropdown` maps to `multiple_choice` with no `choiceStyle`: the property is in
+ * the schema but no value for it is documented anywhere in this repo, and
+ * inventing one is the exact bug this module exists to stop. The pick-one
+ * semantics survive; only the visual affordance is lost.
+ */
+const KIND_ALIASES: Record<string, FieldKindEnum> = {
+  single_choice: FieldKindEnum.MULTIPLE_CHOICE,
+  dropdown: FieldKindEnum.MULTIPLE_CHOICE,
+  paragraph: FieldKindEnum.LONG_TEXT
+}
+
+/** Aliases whose whole point is "pick exactly one", so `allowMultiple` is forced off. */
+const PICK_ONE_ALIASES = new Set(['single_choice', 'dropdown'])
+
+/**
+ * Layout blocks, not questions. They have no title and nothing to ask, so they
+ * are dropped rather than degraded — a `short_text` with no title would be
+ * dropped a moment later anyway, but as "no usable title", which hides what
+ * actually happened.
+ *
+ * `text` is the common one by a wide margin: in the template gallery every real
+ * field is followed by one, so a naive import looks like it loses exactly half
+ * of every template.
+ */
+const LAYOUT_KINDS = new Set(['text', 'separator', 'page_break'])
+
 /** Kinds that carry no question and so are allowed an empty title. */
 const TITLELESS_KINDS = new Set<string>([
   FieldKindEnum.WELCOME,
@@ -146,6 +179,13 @@ function pickAllowed(
 ): Record<string, any> {
   const out: Record<string, any> = {}
   for (const [rawKey, value] of Object.entries(source)) {
+    // An explicitly null key carries the same information as an absent one, so
+    // it is dropped WITHOUT a repair line. Not cosmetic: HeyForm's own template
+    // gallery ships 1,244 fields whose entire default property set is nulls, and
+    // logging those would put ~6,000 lines in front of the handful of repairs
+    // that actually mean the schema has drifted.
+    if (value === null || value === undefined) continue
+
     const key = allowed.has(rawKey) ? rawKey : toCamelCase(rawKey)
     if (!allowed.has(key)) {
       repairs.push(`${where}: dropped unknown key "${rawKey}"`)
@@ -271,7 +311,8 @@ function sanitizeProperties(
   value: unknown,
   kind: string,
   where: string,
-  repairs: string[]
+  repairs: string[],
+  forcePickOne = false
 ): Record<string, any> {
   const source = isPlainObject(value) ? value : {}
   if (value !== undefined && value !== null && !isPlainObject(value)) {
@@ -355,6 +396,15 @@ function sanitizeProperties(
       break
   }
 
+  // A `single_choice` or `dropdown` that arrived claiming allowMultiple is
+  // contradicting its own name; the alias is the more reliable signal.
+  if (forcePickOne && out.allowMultiple !== false) {
+    if (out.allowMultiple === true) {
+      repairs.push(`${where}.properties: forced allowMultiple off for a pick-one kind`)
+    }
+    out.allowMultiple = false
+  }
+
   return out
 }
 
@@ -382,6 +432,14 @@ function sanitizeKind(value: unknown, where: string, repairs: string[]): string 
     if (FIELD_KINDS.has(snake)) {
       repairs.push(`${where}: normalised kind "${value}" to "${snake}"`)
       return snake
+    }
+    // Aliased BEFORE the fallback, and reported as a mapping rather than as an
+    // unknown kind, because the two want different responses from a reader: a
+    // mapping is fine, an unknown kind means something drifted.
+    const alias = KIND_ALIASES[value] ?? KIND_ALIASES[snake]
+    if (alias !== undefined) {
+      repairs.push(`${where}: mapped kind "${value}" to "${alias}"`)
+      return alias
     }
   }
   repairs.push(
@@ -413,6 +471,12 @@ export function sanitizeAIFields(raw: unknown): SanitizeAIFieldsResult {
       return
     }
 
+    const rawKind = typeof entry.kind === 'string' ? entry.kind : ''
+    if (LAYOUT_KINDS.has(rawKind)) {
+      repairs.push(`${where}: dropped "${rawKind}" layout block`)
+      return
+    }
+
     const kind = sanitizeKind(entry.kind, where, repairs)
     const title = sanitizeTitle(entry.title, `${where}.title`, repairs)
 
@@ -430,7 +494,13 @@ export function sanitizeAIFields(raw: unknown): SanitizeAIFieldsResult {
       description: sanitizeTitle(entry.description, `${where}.description`, repairs),
       kind,
       validations: sanitizeValidations(entry.validations, where, repairs),
-      properties: sanitizeProperties(entry.properties, kind, where, repairs),
+      properties: sanitizeProperties(
+        entry.properties,
+        kind,
+        where,
+        repairs,
+        PICK_ONE_ALIASES.has(rawKind)
+      ),
       layout: isPlainObject(entry.layout) ? entry.layout : null
     }
 
