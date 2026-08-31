@@ -106,6 +106,7 @@ Keep `HEYFORM_SSO_ONLY` **off** until the SSO round-trip is verified, then flip 
 | `OPENAI_REASONING_EFFORT` | `minimal`/`low`/`medium`/`high`, or `none` to omit the param. Defaults to `low` on the gateway path, `none` otherwise. |
 | `OPENAI_MAX_COMPLETION_TOKENS` | Ceiling on one completion, reasoning tokens included. Defaults to 8000 on the gateway path, `0` (omitted) otherwise. |
 | `OPENAI_REQUEST_TIMEOUT_MS` | Budget for one user-facing completion. Default 100000. |
+| `WEBHOOK_SIGNING_SECRET` | HMAC-SHA256 key for signing outgoing submission webhooks. Unset → deliveries are unsigned (upstream behaviour). |
 
 ### AI request timeouts
 
@@ -120,6 +121,72 @@ the innermost must be the smallest, or the user gets someone else's error page:
 
 Raising one alone does nothing — the next one down still cuts the request. The
 default Apollo ceiling stays at 30s for every non-AI operation.
+
+---
+
+## Signed submission webhooks — `WEBHOOK_SIGNING_SECRET`
+
+Upstream's webhook integration authenticates **nothing**. `apps/webhook.ts` POSTs
+the submission to the configured URL and that is all — no secret, no header, no
+signature. So the endpoint URL was the only thing standing between an anonymous
+POST and whatever the receiver does with a submission, and a URL that lives in
+this database, is editable by any workspace admin, and is logged by every proxy
+in between is not a secret.
+
+That mattered as soon as SupportHub pointed the `/ticket` bug-report form at a
+receiver that creates **forum topics in a members-only category** (see
+unicef/supporthub#401): anybody who learned the URL could file topics authored
+by the shared `support-hub` account.
+
+### The scheme
+
+When `WEBHOOK_SIGNING_SECRET` is set, every delivery carries two headers:
+
+| Header | Value |
+|---|---|
+| `X-Heyform-Timestamp` | unix **seconds** |
+| `X-Heyform-Signature` | `sha256=<hex HMAC-SHA256 of `${timestamp}.${rawBody}`>` |
+
+Same shape as Stripe and GitHub, so a receiver written against either is already
+almost right. Implementation: `src/utils/webhook-signature.ts`, tested by
+`test/webhook-signature.test.ts`.
+
+Three things about it are deliberate:
+
+1. **The timestamp is inside the MAC, not merely alongside it.** Signing the body
+   alone produces a credential that never expires — capture one valid delivery
+   and it replays for ever. Binding the timestamp in is what lets a stateless
+   receiver enforce a freshness window (SupportHub uses ±300s), and that window
+   is the only replay bound that does not require the receiver to remember every
+   delivery it has ever seen.
+2. **The body is serialised once and sent as a raw `body`**, not via got's
+   `json:` option. The signature has to cover the exact bytes on the wire, and
+   `JSON.parse` → `JSON.stringify` does not round-trip byte-for-byte.
+3. **The secret is global config, not a per-integration setting.** A per-form
+   field would sit in this database in plain text, be visible to every workspace
+   admin, and could not be entered anyway: the integration settings UI
+   (`webapp/src/pages/form/Integrations/IntegrationSettingsItem.tsx`) renders
+   only `type: 'url'` and silently renders nothing for any other type.
+
+### Why unsigned delivery is still allowed
+
+Unset means unsigned, exactly as upstream behaves. This integration also serves
+ordinary self-hosted users pointing forms at Zapier and the like, and silently
+breaking them is not ours to do. **Fail-closed lives on the receiver**:
+SupportHub's `/hooks/heyform-ticket` answers `503` when its own secret is unset
+rather than accepting an unsigned POST, and `401` when the signature does not
+verify.
+
+### Retries, which the receiver has to cope with
+
+Integrations are dispatched through Bull (`queue/integration-queue.ts`) with
+`attempts: BULL_JOB_ATTEMPTS`, 3 by default. `got` itself does **not** retry the
+POST — got 11's default `retry.methods` is GET/PUT/HEAD/DELETE/OPTIONS/TRACE and
+excludes POST — so Bull is the only retry in this path. A receiver whose 2xx was
+lost will therefore see the same submission again, minutes later, which is why
+SupportHub keys on the submission id rather than trusting a single delivery.
+
+---
 
 `docker-compose.supporthub-spike.yml` boots heyform + FerretDB + Redis standalone for testing
 the fork in isolation.

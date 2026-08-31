@@ -186,6 +186,16 @@ export const OPENAI_REQUEST_TIMEOUT_MS: number = +process.env.OPENAI_REQUEST_TIM
 export const HEYFORM_SSO_SECRET: string = process.env.HEYFORM_SSO_SECRET
 // When ON, native auth (login/signup/social/reset) is disabled — enforcement is deferred (see SUPPORTHUB_FORK_NOTES.md). Stays OFF for now.
 export const HEYFORM_SSO_ONLY: boolean = helper.isTrue(process.env.HEYFORM_SSO_ONLY)
+// HMAC-SHA256 key for signing outgoing submission webhooks. Upstream's webhook
+// integration authenticates NOTHING — it POSTs the submission and that is all —
+// so the endpoint URL was the only secret, and a URL stored in this database and
+// travelling through proxy logs is not a secret. When set, every webhook
+// delivery carries `X-Heyform-Timestamp` and `X-Heyform-Signature` and the
+// receiver can refuse anything unsigned. Independent of HEYFORM_SSO_SECRET and
+// SESSION_KEY (NIST SP 800-57 §5.2): a webhook receiver is a different party
+// from SupportHub's SSO, and one key per relationship means a leak on one side
+// does not hand over the other.
+export const WEBHOOK_SIGNING_SECRET: string = process.env.WEBHOOK_SIGNING_SECRET
 
 // S3
 export const S3_ENDPOINT = process.env.S3_ENDPOINT
