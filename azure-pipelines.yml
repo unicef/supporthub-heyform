@@ -1,4 +1,5 @@
-# Builds the SupportHub heyform fork and publishes it to the UNICEF ACR.
+# Builds the SupportHub heyform fork and publishes it to the UNICEF ACR and to
+# Jozian's registry (prod pulls from the latter).
 #
 # Exists because the dev deployment (supporthub_ops PR #95) pins
 # `unicrsdsupporthub.azurecr.io/supporthub-heyform`, and nothing was publishing
@@ -49,6 +50,26 @@ steps:
     displayName: push supporthub-heyform image to container registry
     inputs:
       containerRegistry: "unicrsdsupporthub"
+      repository: "supporthub-heyform"
+      command: "push"
+      tags: "$(dockerTag),$(Build.SourceVersion),$(Build.SourceBranchName)_$(Build.SourceVersion)_$(Build.BuildNumber)"
+  # Prod (supporthub_ops k8s/overlays/k3s-supporthub.global) pulls only from
+  # Jozian's registry, so the same image goes there too (supporthub_ops#111),
+  # as unicef/supporthub does (#464). Re-tagged, not rebuilt: what prod runs is
+  # byte-identical to what dev was verified on. Pull-request builds stay out of
+  # the prod registry.
+  - bash: |
+      set -euo pipefail
+      for tag in "$(dockerTag)" "$(Build.SourceVersion)" "$(Build.SourceBranchName)_$(Build.SourceVersion)_$(Build.BuildNumber)"; do
+        docker tag "unicrsdsupporthub.azurecr.io/supporthub-heyform:${tag}" "supporthubjoz.azurecr.io/supporthub-heyform:${tag}"
+      done
+    displayName: Tag supporthub-heyform image for the Jozian registry
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  - task: Docker@2
+    displayName: push supporthub-heyform image to the Jozian registry
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    inputs:
+      containerRegistry: "supporthubjoz-acr"
       repository: "supporthub-heyform"
       command: "push"
       tags: "$(dockerTag),$(Build.SourceVersion),$(Build.SourceBranchName)_$(Build.SourceVersion)_$(Build.BuildNumber)"
