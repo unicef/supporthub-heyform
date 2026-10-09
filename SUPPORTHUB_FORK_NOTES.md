@@ -39,10 +39,11 @@ server-side — never trusted from the JWT body.
 
 Claims: `{ tenantRef, tenantName, domain, admins: [{ remoteId, displayName? }], exp, jti }`.
 
-Creates-or-reuses a Team (owner = first admin's heyform userId), a default Project, and one
-heyform User per admin (synthetic email `admin+<remoteId>@heyform.local`, locked password;
-team role pinned to `ADMIN`). **Idempotent by input** — re-sending the same admins returns
-the same IDs (keyed on the synthetic email + owner-team reuse); no duplicate teams/projects/users.
+Creates-or-reuses ONE Team per tenant (tagged `supporthubTenantRef = tenantRef`; owner = first
+admin's heyform userId), a default Project, and one heyform User per admin (synthetic email
+`admin+<remoteId>@heyform.local`, locked password; team role pinned to `ADMIN`). **Idempotent by
+input**: the team is keyed on `tenantRef`, never the owner, so tenants sharing a first admin get
+separate teams. An untagged (pre-tag) team is adopted only by the tenant whose name it carries.
 
 Response: `{ "teamId": "<id>", "projectId": "<id>", "adminUserIds": { "<remoteId>": "<heyformUserId>" } }`.
 
