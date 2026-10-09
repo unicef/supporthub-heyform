@@ -142,6 +142,17 @@ function getAdaptedColor(color: string, alphaNum = 0.5, step = 20): string {
   return `rgba(${red}, ${green}, ${blue}, ${alphaNum})`
 }
 
+/**
+ * A font family as a quoted CSS string. Unquoted, a name with a word that
+ * starts with a digit ("Source Sans 3", "Exo 2") is not a valid family name,
+ * so the whole `font-family` that reads the variable is dropped and the page
+ * falls back to its default font. Quotes and backslashes are stripped so the
+ * value cannot break out of the string.
+ */
+export function cssFontFamily(name?: string): string {
+  return `"${String(name ?? '').replace(/["\\]/g, '')}"`
+}
+
 export function getThemeStyle(theme: FormTheme, query?: Record<string, any>): string {
   if (helper.isTrue(query?.transparentBackground)) {
     theme.backgroundColor = 'transparent'
@@ -150,7 +161,7 @@ export function getThemeStyle(theme: FormTheme, query?: Record<string, any>): st
 
   return `
   html {
-    --heyform-font-family: ${theme.fontFamily};
+    --heyform-font-family: ${cssFontFamily(theme.fontFamily)};
     --heyform-question-color: ${theme.questionTextColor};
     --heyform-description-color: ${alpha(theme.questionTextColor!, 0.8)};
     --heyform-label-color: ${alpha(theme.questionTextColor!, 0.5)};
@@ -231,7 +242,9 @@ export function getStripeElementStyle(theme: FormTheme) {
   return {
     base: {
       color: theme.answerTextColor,
-      fontFamily: [theme.fontFamily, SYSTEM_FONTS].filter(Boolean).join(','),
+      fontFamily: [theme.fontFamily && cssFontFamily(theme.fontFamily), SYSTEM_FONTS]
+        .filter(Boolean)
+        .join(','),
       fontSize: '24px',
       fontSmoothing: 'antialiased',
       '::placeholder': {
