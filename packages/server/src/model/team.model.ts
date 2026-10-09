@@ -45,6 +45,11 @@ export class TeamModel extends Document {
   @Prop()
   storageQuota?: number
 
+  // SupportHub tenant this team was provisioned for (`/api/provision`'s
+  // `tenantRef`). The provision lookup key: one team per tenant.
+  @Prop({ index: true })
+  supporthubTenantRef?: string
+
   /**
    * Attach references to the team model for easy query,
    * will not be used as a column in the team schema

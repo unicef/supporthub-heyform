@@ -15,6 +15,7 @@ import {
 } from '@service'
 import {
   Logger,
+  chooseProvisionTeam,
   passwordHash,
   readFormsClaims,
   readProvisionClaims,
@@ -152,13 +153,22 @@ export class SupporthubController {
 
       const ownerId = adminUserIds[claims.admins[0].remoteId]
 
-      // Idempotency key (heyform-side): the owner user. Reuse the team owned by them.
+      // Idempotency key (heyform-side): the tenant, never the owner (see
+      // chooseProvisionTeam).
       let teamId: string
       let projectId: string
-      const ownedTeams = await this.teamService.findAllBy({ ownerId })
+      const choice = chooseProvisionTeam(
+        await this.teamService.findAllBy({ supporthubTenantRef: claims.tenantRef }),
+        await this.teamService.findAllBy({ ownerId }),
+        claims.tenantRef,
+        claims.tenantName
+      )
 
-      if (helper.isValidArray(ownedTeams)) {
-        teamId = ownedTeams[0].id
+      if (choice.kind !== 'create') {
+        teamId = choice.teamId
+        if (choice.kind === 'adopt') {
+          await this.teamService.update(teamId, { supporthubTenantRef: claims.tenantRef })
+        }
         const projects = await this.projectService.findAllInTeam(teamId)
         if (helper.isValidArray(projects)) {
           projectId = projects[0].id
@@ -171,6 +181,7 @@ export class SupporthubController {
         teamId = await this.teamService.create({
           ownerId,
           name: claims.tenantName,
+          supporthubTenantRef: claims.tenantRef,
           storageQuota: 0,
           // Embedded in a tenant's own site, so the "Made with HeyForm" badge
           // is off by default rather than something an admin has to find and
