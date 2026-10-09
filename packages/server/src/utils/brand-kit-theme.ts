@@ -10,11 +10,12 @@ import type { FormTheme } from '@heyform-inc/shared-types-enums'
  * with its own look) keeps it. No brand kit, or one without a theme, leaves
  * the form unchanged.
  */
-export function withBrandKitTheme<T extends { themeSettings?: { theme?: FormTheme } | null }>(
+export function withBrandKitTheme<T extends Record<string, any>>(
   form: T,
   brandKitTheme: FormTheme | null | undefined
-): T {
-  if (form.themeSettings?.theme && Object.keys(form.themeSettings.theme).length > 0) {
+): T & { themeSettings?: Record<string, any> | null } {
+  const own: FormTheme | undefined = form.themeSettings?.theme
+  if (own && Object.keys(own).length > 0) {
     return form
   }
   if (!brandKitTheme || Object.keys(brandKitTheme).length === 0) {
