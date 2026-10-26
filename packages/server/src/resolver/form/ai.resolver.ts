@@ -25,7 +25,13 @@ import { helper, ms, parseJson } from '@heyform-inc/utils'
 import { FormModel, TeamModel, UserModel } from '@model'
 import { Args, Mutation, Resolver } from '@nestjs/graphql'
 import { FormService, OpenAIService, RedisService } from '@service'
-import { Logger, parseAIJson, sanitizeAIFields, sanitizeFormDrafts } from '@utils'
+import {
+  Logger,
+  fillAIFieldDefaults,
+  parseAIJson,
+  repairAIFieldKinds,
+  sanitizeFormDrafts
+} from '@utils'
 import { GraphQLJSONObject } from 'graphql-type-json'
 
 interface AIFormResult {
@@ -66,13 +72,15 @@ export class AIResolver {
 
   /**
    * Everything the model produces passes through here before it is stored or
-   * returned. Three passes, because they answer different questions:
+   * returned:
    *
-   *  - `sanitizeAIFields` (fork) — REPAIR what the model got nearly right:
-   *    string `choices`, missing per-kind requirements, kind aliases, bogus
-   *    ids. Without it the schema below rejects the whole generation.
-   *  - `normalizeAIFields` (upstream) — VALIDATE the shape against the app's
-   *    schema; throws when the output is still unusable.
+   *  - `repairAIFieldKinds` (fork) — map aliased and unknown kinds, which
+   *    upstream's schema would reject the whole generation over.
+   *  - `normalizeAIFields` (upstream) — validate and normalise the shape;
+   *    throws when the output is still unusable.
+   *  - `fillAIFieldDefaults` (fork) — add the properties a kind cannot work
+   *    without (yes_no choices, rating total, ...), which upstream accepts
+   *    missing and which then render broken.
    *  - `sanitizeFormDrafts` — is the rich text SAFE? Every human save already
    *    goes through it via `updateFormSchemas`/`publishForm`.
    *
@@ -80,13 +88,15 @@ export class AIResolver {
    * the signal that the prompt has drifted from the schema again.
    */
   private sanitizeFields(fields: unknown, context: string, errorMessage: string): any[] {
-    const { fields: shaped, repairs } = sanitizeAIFields(fields)
+    const kinds = repairAIFieldKinds(fields)
+    const defaults = fillAIFieldDefaults(this.normalizeFields(kinds.fields, errorMessage))
+    const repairs = [...kinds.repairs, ...defaults.repairs]
     if (repairs.length > 0) {
       this.logger.info(
         `${context}: repaired ${repairs.length} problem(s) in AI output — ${repairs.join('; ')}`
       )
     }
-    return sanitizeFormDrafts(this.normalizeFields(shaped, errorMessage))
+    return sanitizeFormDrafts(defaults.fields)
   }
 
   @Mutation(returns => String)
@@ -174,8 +184,8 @@ export class AIResolver {
     }
 
     // This mutation EDITS existing questions, so the ids coming back may be ones
-    // already referenced by logic rules. `sanitizeAIFields` keeps any id that is
-    // well-formed and only mints a replacement for a missing or duplicate one,
+    // already referenced by logic rules. `normalizeAIFields` keeps any id it is
+    // given and only mints a replacement for a missing or duplicate one,
     // which is what makes it safe to run here.
     const fields = this.sanitizeFields(generated, 'createFieldsWithAI', 'Failed to create fields')
     if (!helper.isValidArray(fields)) {

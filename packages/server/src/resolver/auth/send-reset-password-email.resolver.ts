@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common'
+import { BadRequestException, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 
 import { HEYFORM_SSO_ONLY } from '@environments'

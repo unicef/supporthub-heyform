@@ -1,6 +1,6 @@
 import { CaptchaKindEnum, FormField, FormStatusEnum } from '@heyform-inc/shared-types-enums'
 import { InjectQueue } from '@nestjs/bull'
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable, Optional } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Queue } from 'bull'
 import { Model } from 'mongoose'
@@ -31,10 +31,12 @@ export class FormService {
     @InjectModel(FormModel.name)
     private readonly formModel: Model<FormModel>,
     private readonly teamService: TeamService,
-    private readonly brandKitService: BrandKitService,
     @InjectQueue('TranslateFormQueue')
     private readonly translateFormQueue: Queue,
-    private readonly redisService: RedisService
+    private readonly redisService: RedisService,
+    // supporthub-fork: last and @Optional so upstream's tests, which construct
+    // FormService positionally, keep compiling. Nest always provides it.
+    @Optional() private readonly brandKitService?: BrandKitService
   ) {}
 
   async findById(id: string): Promise<FormModel | null> {
@@ -197,7 +199,7 @@ export class FormService {
   public async create(form: FormModel | any): Promise<string> {
     // Every creation path (blank, AI, template, duplicate) lands here, so a
     // form without a theme of its own starts from the workspace brand kit.
-    const brandKit = form?.teamId ? await this.brandKitService.findByTeamId(form.teamId) : null
+    const brandKit = form?.teamId ? await this.brandKitService?.findByTeamId(form.teamId) : null
     const result = await this.formModel.create(withBrandKitTheme(form, brandKit?.theme))
     return result.id
   }
