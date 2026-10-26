@@ -12,7 +12,13 @@ export class AuthService {
     })
   }
 
-  static signUp(input: { name: string; email: string; password: string }) {
+  static signUp(input: {
+    name: string
+    email: string
+    password: string
+    teamId?: string
+    inviteCode?: string
+  }) {
     return apollo.mutate({
       mutation: SIGN_UP_GQL,
       variables: {

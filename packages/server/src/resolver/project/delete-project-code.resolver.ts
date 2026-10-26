@@ -26,10 +26,14 @@ export class DeleteProjectCodeResolver {
       throw new BadRequestException("You don't have permission to delete the project")
     }
 
-    const key = `verify_delete_project:${project.id}`
-    const code = await this.authService.getVerificationCode(key)
+    if (!this.mailService.isConfigured()) {
+      return false
+    }
 
-    this.mailService.projectDeletionRequest(
+    const key = `verify_delete_project:${project.id}`
+    const code = await this.authService.getVerificationCodeWithRateLimit(key)
+
+    await this.mailService.projectDeletionRequest(
       user.email,
       {
         teamName: team.name,

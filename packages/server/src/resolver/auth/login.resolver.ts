@@ -1,7 +1,8 @@
-import { BadRequestException, UseGuards } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, UseGuards } from '@nestjs/common'
+import { createHash } from 'crypto'
 
 import { GraphqlRequest, GraphqlResponse } from '@decorator'
-import { HEYFORM_SSO_ONLY } from '@environments'
+import { DISABLE_LOGIN_WITH_PASSWORD, HEYFORM_SSO_ONLY } from '@environments'
 import { LoginInput } from '@graphql'
 import { DeviceIdGuard } from '@guard'
 import { date, helper } from '@heyform-inc/utils'
@@ -9,6 +10,16 @@ import { UserActivityKindEnum } from '@model'
 import { Args, Query, Resolver } from '@nestjs/graphql'
 import { AuthService, MailService, UserService } from '@service'
 import { ClientInfo, GqlClient, comparePassword } from '@utils'
+
+export function loginAttemptKey(
+  userId: string,
+  client: Pick<ClientInfo, 'ip' | 'deviceId'>
+): string {
+  const source = client.ip || client.deviceId
+  const sourceHash = createHash('sha256').update(String(source)).digest('hex').slice(0, 24)
+
+  return `limit:login:${userId}:${sourceHash}`
+}
 
 @Resolver()
 @UseGuards(DeviceIdGuard)
@@ -30,13 +41,17 @@ export class LoginResolver {
       throw new BadRequestException('Native authentication is disabled')
     }
 
+    if (DISABLE_LOGIN_WITH_PASSWORD) {
+      throw new ForbiddenException('Password login is disabled.')
+    }
+
     const user = await this.userService.findByEmail(input.email)
 
     if (helper.isEmpty(user)) {
       throw new BadRequestException('Incorrect email or password.')
     }
 
-    const key = `limit:login:${user.id}`
+    const key = loginAttemptKey(user.id, client)
 
     await this.authService.attemptsCheck(key, async () => {
       if (helper.isEmpty(user.password)) {
@@ -49,6 +64,7 @@ export class LoginResolver {
         throw new BadRequestException('Incorrect email or password.')
       }
     })
+    await this.authService.clearAttempts(key)
 
     const devices = await this.authService.devices(user.id)
 

@@ -15,18 +15,19 @@ import {
   DISSOLVE_TEAM_GQL,
   FORMS_GQL,
   FORM_DETAIL_GQL,
-  JOIN_TEAM_GQL,
   MOVE_FORM_TO_TRASH_GQL,
   OPEN_FORM_GQL,
   PUBLIC_FORM_GQL,
   PUBLISH_FORM_GQL,
+  SIGN_UP_GQL,
   SUBMISSIONS_GQL,
   TEAMS_GQL,
   TEAM_MEMBERS_GQL,
   UPDATE_FORM_SCHEMAS_GQL,
-  UPDATE_SUBMISSIONS_CATEGORY_GQL
+  UPDATE_SUBMISSIONS_CATEGORY_GQL,
+  UPDATE_TEAM_GQL
 } from './helpers/gql'
-import { randomString, uniqueName } from './helpers/random'
+import { randomString, strongPassword, uniqueEmail, uniqueName } from './helpers/random'
 import { defineSuite } from './helpers/runner'
 import { seedProjectMember, seedTeamMember } from './helpers/seed'
 import { readLatestVerificationCode } from './helpers/verification'
@@ -43,6 +44,7 @@ interface FlowState {
   inviteCode: string
   seedProjectId: string
   projectId: string
+  projectName: string
   formId: string
   fieldId: string
   submissionId: string
@@ -92,15 +94,32 @@ export function build(baseUrl: string) {
     state.seedProjectId = team.projects[0].id
   })
 
-  test('collaborator joins the workspace via invite code', async () => {
-    const { teamId, inviteCode } = need(state, ['teamId', 'inviteCode'])
-    const collaborator = await signUpUser(baseUrl, { name: uniqueName('Collab') })
-    state.collaborator = collaborator
-
-    const ok = await collaborator.client.gqlOk<boolean>('joinTeam', JOIN_TEAM_GQL, {
-      input: { teamId, inviteCode }
+  test('sign-up rejects an invalid workspace invitation', async () => {
+    const { teamId } = need(state, ['teamId'])
+    const client = new E2EClient({ baseUrl })
+    const result = await client.gql('signUp', SIGN_UP_GQL, {
+      input: {
+        name: uniqueName('Invalid Invite'),
+        email: uniqueEmail('invalid-invite'),
+        password: strongPassword(),
+        teamId,
+        inviteCode: 'totally-wrong-code'
+      }
     })
-    assert.strictEqual(ok, true)
+
+    assert.ok(result.errors.length > 0, 'invalid invitation should error')
+    assert.match(result.errors[0].message, /invitation.*invalid|invalid.*invitation/i)
+    assert.strictEqual(client.isAuthenticated(), false)
+  })
+
+  test('collaborator joins the workspace during sign-up with an invitation', async () => {
+    const { teamId, inviteCode } = need(state, ['teamId', 'inviteCode'])
+    const collaborator = await signUpUser(baseUrl, {
+      name: uniqueName('Collab'),
+      teamId,
+      inviteCode
+    })
+    state.collaborator = collaborator
 
     const teams = await collaborator.client.gqlOk<any[]>('teams', TEAMS_GQL)
     assert.ok(
@@ -157,14 +176,16 @@ export function build(baseUrl: string) {
       'member',
       'teamId'
     ])
+    const projectName = uniqueName('Flow Project')
     const projectId = await admin.client.gqlOk<string>('createProject', CREATE_PROJECT_GQL, {
       input: {
         teamId,
-        name: uniqueName('Flow Project'),
+        name: projectName,
         memberIds: [collaborator.id, member.id]
       }
     })
     state.projectId = projectId
+    state.projectName = projectName
 
     // memberIds wiring is best-effort in createProject; ensure they're members
     // so PermissionGuard's project-scope check passes for both non-admin roles.
@@ -235,6 +256,20 @@ export function build(baseUrl: string) {
     assert.strictEqual(published, true)
   })
 
+  test('anonymous respondent receives the workspace branding setting', async () => {
+    const { admin, formId, teamId } = need(state, ['admin', 'formId', 'teamId'])
+
+    await admin.client.gqlOk<boolean>('updateTeam', UPDATE_TEAM_GQL, {
+      input: { teamId, removeBranding: true }
+    })
+
+    const respondent = new E2EClient({ baseUrl })
+    const publicForm = await respondent.gqlOk<any>('publicForm', PUBLIC_FORM_GQL, {
+      input: { formId }
+    })
+    assert.strictEqual(publicForm.settings.removeBranding, true)
+  })
+
   test('anonymous respondent submits to the form', async () => {
     const { formId, fieldId } = need(state, ['formId', 'fieldId'])
 
@@ -256,6 +291,21 @@ export function build(baseUrl: string) {
     await respondent.gqlOk('completeSubmission', COMPLETE_SUBMISSION_GQL, {
       input: { formId, answers: {}, hiddenFields: [], openToken }
     })
+  })
+
+  test('admin exports submissions as CSV over a bodyless GET request', async () => {
+    const { admin, formId } = need(state, ['admin', 'formId'])
+    const result = await admin.client.restGet(
+      `/api/export/submissions?formId=${encodeURIComponent(formId)}`
+    )
+
+    assert.strictEqual(result.status, 200, 'submission export should succeed')
+    assert.match(
+      result.headers.get('content-disposition') ?? '',
+      /attachment; filename=".*\.csv"/,
+      'response should download a CSV file'
+    )
+    assert.match(result.text, /What is your name\?/, 'CSV should contain the form field')
   })
 
   test('admin sees the submission in inbox, archives it, then deletes it', async () => {
@@ -368,19 +418,24 @@ export function build(baseUrl: string) {
     assert.ok(result.errors.length > 0, 'deleted form is not readable')
   })
 
-  test('admin requests a code and deletes the project', async () => {
-    const { admin, projectId, teamId } = need(state, ['admin', 'projectId', 'teamId'])
+  test('admin confirms and deletes the project', async () => {
+    const { admin, projectId, projectName, teamId } = need(state, [
+      'admin',
+      'projectId',
+      'projectName',
+      'teamId'
+    ])
 
     const requested = await admin.client.gqlOk<boolean>(
       'deleteProjectCode',
       DELETE_PROJECT_CODE_GQL,
       { input: { projectId } }
     )
-    assert.strictEqual(requested, true)
-
-    const code = await readLatestVerificationCode(`verify_delete_project:${projectId}`)
+    const confirmation = requested
+      ? { code: await readLatestVerificationCode(`verify_delete_project:${projectId}`) }
+      : { name: projectName }
     const deleted = await admin.client.gqlOk<boolean>('deleteProject', DELETE_PROJECT_GQL, {
-      input: { projectId, code }
+      input: { projectId, ...confirmation }
     })
     assert.strictEqual(deleted, true)
 

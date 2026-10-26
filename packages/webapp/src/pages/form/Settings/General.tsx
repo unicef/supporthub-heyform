@@ -7,7 +7,7 @@ export default function FormSettingsGeneral() {
 
   return (
     <section id="general">
-      <h2 className="hf-section-title">{t('form.settings.general.title')}</h2>
+      <h2 className="text-lg font-semibold">{t('form.settings.general.title')}</h2>
 
       <div className="mt-4 space-y-8">
         <Form.Item
@@ -45,6 +45,16 @@ export default function FormSettingsGeneral() {
           name="enableNavigationArrows"
           label={t('form.settings.general.navigationArrows.headline')}
           description={t('form.settings.general.navigationArrows.subHeadline')}
+          isInline
+        >
+          <Switch />
+        </Form.Item>
+
+        <Form.Item
+          className="[&_[data-slot=content]]:pt-1.5"
+          name="openLinksInNewTab"
+          label={t('form.settings.general.openLinksInNewTab.headline')}
+          description={t('form.settings.general.openLinksInNewTab.subHeadline')}
           isInline
         >
           <Switch />

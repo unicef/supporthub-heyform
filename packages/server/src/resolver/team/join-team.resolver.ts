@@ -23,11 +23,13 @@ export class JoinTeamResolver {
       throw new NotFoundException('The workspace does not exist')
     }
 
-    if (team.inviteCode !== input.inviteCode) {
+    const invitation = await this.teamService.findJoinableByInvite(input.teamId, input.inviteCode)
+
+    if (!invitation && team.allowJoinByInviteLink) {
       throw new BadRequestException('The invitation code of the workspace does not match')
     }
 
-    if (!team.allowJoinByInviteLink) {
+    if (!invitation) {
       throw new BadRequestException('The workspace is not allowed to join')
     }
 

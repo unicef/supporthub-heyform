@@ -195,7 +195,6 @@ async function testHttpFormGuardReadsRequestQuery() {
     user: {
       id: 'user_collaborator'
     },
-    body: {},
     query: {
       formId: 'form_1'
     },

@@ -36,6 +36,7 @@ import {
   TableState,
   Tooltip
 } from '@/components'
+import { isSubmissionIpDisabled } from '@/consts'
 import { useAppStore, useFormStore } from '@/store'
 import { SubmissionType } from '@/types'
 
@@ -105,6 +106,8 @@ export default function FormSubmissions() {
     }
   )
 
+  const showIpAddress = !isSubmissionIpDisabled() && !!form?.settings?.displayIpAddress
+
   const fields = useMemo(() => {
     const submitDateField = {
       id: FieldKindEnum.SUBMIT_DATE,
@@ -128,8 +131,25 @@ export default function FormSubmissions() {
       title: row.name
     }))
 
-    return [submitDateField, ...questionFields, ...variables, ...hiddenFields] as FormField[]
-  }, [form?.drafts, form?.hiddenFields, form?.variables, t])
+    // The server only sends IP addresses when the form displays them
+    const ipAddressField = showIpAddress
+      ? [
+          {
+            id: FieldKindEnum.IP_ADDRESS,
+            kind: FieldKindEnum.IP_ADDRESS,
+            title: t('form.builder.question.ipAddress')
+          }
+        ]
+      : []
+
+    return [
+      submitDateField,
+      ...questionFields,
+      ...variables,
+      ...hiddenFields,
+      ...ipAddressField
+    ] as FormField[]
+  }, [form?.drafts, form?.hiddenFields, form?.variables, showIpAddress, t])
 
   async function fetch({ current, pageSize }: TableFetchParams) {
     const { total, submissions } = await SubmissionService.submissions({
@@ -158,7 +178,17 @@ export default function FormSubmissions() {
           id: FieldKindEnum.SUBMIT_DATE,
           kind: FieldKindEnum.SUBMIT_DATE,
           value: row.endAt || 0
-        }
+        },
+
+        ...(row.ip
+          ? [
+              {
+                id: FieldKindEnum.IP_ADDRESS,
+                kind: FieldKindEnum.IP_ADDRESS,
+                value: row.ip
+              }
+            ]
+          : [])
       ] as Answer[]
     }))
 
@@ -239,7 +269,7 @@ export default function FormSubmissions() {
 
   return (
     <>
-      <div className={cn(isMaximized ? 'bg-foreground fixed inset-0 p-6' : 'mt-6 px-6')}>
+      <div className={cn(isMaximized ? 'bg-foreground fixed inset-0 p-4' : 'mt-4')}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-x-2.5">
             <Select
@@ -313,17 +343,17 @@ export default function FormSubmissions() {
             ref={tableRef}
             classNames={{
               container: cn(
-                'hf-table-shell scrollbar text-sm',
+                'scrollbar overflow-auto rounded-md border border-accent text-sm',
                 isMaximized ? 'h-[calc(100vh-9rem)]' : 'h-[calc(100vh-23.45rem)]'
               ),
               table:
-                '[&_tbody_td]:max-w-60 [&_tbody_td]:font-normal [&_thead_th]:truncate [&_thead_th]:max-w-60',
+                '[&_tbody_td]:max-w-60 [&_tbody_td]:h-10 [&_tbody_td]:font-normal [&_thead]:bg-foreground [&_thead_th]:h-10 [&_thead_th]:font-normal [&_thead_th]:truncate [&_thead_th]:max-w-60',
               footer: 'justify-end text-sm'
             }}
             columns={columns}
             loader={
               <Repeat count={20}>
-                <div className="border-accent-light flex h-11 items-center gap-x-8 border-b px-4">
+                <div className="border-accent flex h-10 items-center gap-x-8 border-b px-4">
                   <div className="skeleton h-4 w-4 rounded-md" />
                   <div className="skeleton h-4 w-20 rounded-md" />
                   <div className="skeleton h-4 w-60 rounded-md" />

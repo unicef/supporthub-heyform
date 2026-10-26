@@ -58,7 +58,7 @@ export class OpenAIService {
     // deployment owns its own defaults. SupportHub's own client sends none of
     // them for the same reason.
     const sampling = helper.isEmpty(OPENAI_API_VERSION)
-      ? { temperature: 0, top_p: 1, frequency_penalty: 1, presence_penalty: 1 }
+      ? { temperature: 0, top_p: 1, frequency_penalty: 0, presence_penalty: 0 }
       : {}
 
     // `reasoning_effort` and `max_completion_tokens` both postdate openai@4.38.2

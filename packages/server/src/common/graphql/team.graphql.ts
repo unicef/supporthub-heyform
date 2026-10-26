@@ -1,5 +1,7 @@
 import {
+  ArrayMaxSize,
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsEmail,
@@ -64,6 +66,8 @@ export class PublicTeamDetailInput extends TeamDetailInput {
 export class InviteMemberInput extends TeamDetailInput {
   @Field(type => [String])
   @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @ArrayUnique(email => String(email).trim().toLowerCase())
   @IsEmail({}, { each: true })
   emails: string[]
 }

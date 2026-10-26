@@ -6,7 +6,7 @@ import {
   STATEMENT_FIELD_KINDS
 } from '@heyform-inc/shared-types-enums'
 import { Injectable } from '@nestjs/common'
-import { parseAsync } from 'json2csv'
+import { FieldInfo, parseAsync } from 'json2csv'
 
 import { htmlUtils, parsePlainAnswer } from '@heyform-inc/answer-utils'
 import { helper, unixDate } from '@heyform-inc/utils'
@@ -15,84 +15,131 @@ import { SubmissionModel } from '@model'
 const FIELD_ID_KEY = '#'
 const START_DATE_KEY = 'Start Date (UTC)'
 const SUBMIT_DATE_KEY = 'Submit Date (UTC)'
+const IP_ADDRESS_KEY = 'IP Address'
+const SPREADSHEET_FORMULA_PREFIXES = new Set(['=', '+', '-', '@'])
+
+function neutralizeSpreadsheetFormula(value: string): string {
+  let index = 0
+
+  while (index < value.length) {
+    const character = value[index]
+    const code = character.charCodeAt(0)
+    const isControlCharacter = code <= 0x1f || (code >= 0x7f && code <= 0x9f)
+
+    if (!isControlCharacter && character.trim() !== '') {
+      break
+    }
+
+    index += 1
+  }
+
+  if (SPREADSHEET_FORMULA_PREFIXES.has(value[index])) {
+    return `'${value}`
+  }
+
+  return value
+}
+
+// An answer as readable text, as in the CSV export: file uploads as their
+// URL, other answers as in email notifications
+export function answerToText(answer: Answer): string {
+  const value = answer.value
+  let result = ''
+
+  if (helper.isEmpty(value)) {
+    return result
+  }
+
+  switch (answer?.kind) {
+    case FieldKindEnum.FILE_UPLOAD:
+      if (helper.isString(value)) {
+        result = value
+      } else if (helper.isObject(value)) {
+        if (helper.isString(value.url)) {
+          result = value.url
+        } else {
+          const prefix = value.urlPrefix || value.cdnUrlPrefix
+          const key = value.key || value.cdnKey
+
+          if (helper.isString(prefix) && helper.isString(key)) {
+            result = `${prefix.replace(/\/+$/, '')}/${key.replace(/^\/+/, '')}`
+          }
+        }
+      }
+      break
+
+    default:
+      try {
+        result = parsePlainAnswer(answer)
+      } catch {
+        // Historical submissions may predate current validation. Treat a malformed answer as
+        // an empty cell so one poisoned record cannot make the entire form unexportable.
+        result = ''
+      }
+      break
+  }
+
+  return result
+}
 
 @Injectable()
 export class ExportFileService {
   async csv(
     formFields: FormField[],
     selectedHiddenFields: HiddenField[],
-    submissions: SubmissionModel[]
+    submissions: SubmissionModel[],
+    withIp = false
   ): Promise<string> {
-    const records: Record<string, any>[] = []
     const selectedFormFields = formFields
       .filter(field => !STATEMENT_FIELD_KINDS.includes(field.kind))
       .map(field => ({
         ...field,
-        title: helper.isArray(field.title) ? htmlUtils.serialize(field.title) : field.title
+        title: neutralizeSpreadsheetFormula(
+          helper.isArray(field.title) ? htmlUtils.serialize(field.title) : String(field.title || '')
+        )
       }))
 
-    const fields: string[] = [
-      FIELD_ID_KEY,
-      ...selectedFormFields.map(field => field.title),
-      ...selectedHiddenFields.map(hiddenField => hiddenField.name),
-      START_DATE_KEY,
-      SUBMIT_DATE_KEY
+    const fields: FieldInfo<SubmissionModel>[] = [
+      {
+        label: FIELD_ID_KEY,
+        value: submission => submission.id
+      },
+      ...selectedFormFields.map(field => ({
+        label: field.title,
+        value: (submission: SubmissionModel) => {
+          const answer = submission.answers.find(answer => answer.id === field.id)
+
+          return helper.isEmpty(answer) ? '' : neutralizeSpreadsheetFormula(answerToText(answer))
+        }
+      })),
+      ...selectedHiddenFields.map(hiddenField => ({
+        label: neutralizeSpreadsheetFormula(hiddenField.name),
+        value: (submission: SubmissionModel) => {
+          const value = submission.hiddenFields.find(answer => answer.id === hiddenField.id)?.value
+
+          return helper.isString(value) ? neutralizeSpreadsheetFormula(value) : value
+        }
+      })),
+      {
+        label: START_DATE_KEY,
+        value: submission => (submission.startAt ? unixDate(submission.startAt).toISOString() : '')
+      },
+      {
+        label: SUBMIT_DATE_KEY,
+        value: submission => (submission.startAt ? unixDate(submission.endAt!).toISOString() : '')
+      },
+      ...(withIp
+        ? [
+            {
+              label: IP_ADDRESS_KEY,
+              value: (submission: SubmissionModel) => submission.ip || ''
+            }
+          ]
+        : [])
     ]
 
-    for (const submission of submissions) {
-      const record: Record<string, any> = {
-        [FIELD_ID_KEY]: submission.id
-      }
-
-      for (const field of selectedFormFields) {
-        let answer: any = submission.answers.find(answer => answer.id === field.id)
-
-        if (helper.isEmpty(answer)) {
-          answer = ''
-        } else {
-          answer = this.parseAnswer(answer)
-        }
-
-        record[field.title] = answer
-      }
-
-      for (const selectedHiddenField of selectedHiddenFields) {
-        const hiddenFieldValue = submission.hiddenFields.find(
-          hiddenField => hiddenField.id === selectedHiddenField.id
-        )?.value
-
-        record[selectedHiddenField.name] = hiddenFieldValue
-      }
-
-      record[START_DATE_KEY] = submission.startAt ? unixDate(submission.startAt!).toISOString() : ''
-      record[SUBMIT_DATE_KEY] = submission.startAt ? unixDate(submission.endAt!).toISOString() : ''
-
-      records.push(record)
-    }
-
-    return parseAsync(records, {
+    return parseAsync(submissions, {
       fields
     })
-  }
-
-  private parseAnswer(answer: Answer): string {
-    const value = answer.value
-    let result = ''
-
-    if (helper.isEmpty(value)) {
-      return result
-    }
-
-    switch (answer?.kind) {
-      case FieldKindEnum.FILE_UPLOAD:
-        result = helper.isObject(value) ? value.url : helper.isString(value) ? value : ''
-        break
-
-      default:
-        result = parsePlainAnswer(answer)
-        break
-    }
-
-    return result
   }
 }

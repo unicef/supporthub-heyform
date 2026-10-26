@@ -1,5 +1,5 @@
 import { HiddenFieldAnswer } from '@heyform-inc/shared-types-enums'
-import { IsOptional, IsString } from 'class-validator'
+import { IsOptional, IsString, Length } from 'class-validator'
 
 import { CdnTokenInput } from './user.graphql'
 import { Field, InputType, ObjectType } from '@nestjs/graphql'
@@ -32,6 +32,7 @@ export class VerifyPasswordInput {
   formId: string
 
   @Field()
+  @Length(1, 128)
   password: string
 }
 

@@ -1,404 +1,192 @@
+import { FORM_FIELD_KINDS } from '@heyform-inc/shared-types-enums'
 import * as assert from 'assert'
 
-// Imported directly, NOT via the `@utils` barrel: that barrel reaches
-// `crypto.ts` → `bcrypt`, whose native binding is absent in a plain local
-// install, and this is a pure function that needs none of it. `ai-json.test.ts`
-// imports the same way.
-import { sanitizeAIFields } from '../src/utils/ai-fields'
+import { normalizeAIFields } from '../src/utils/ai-fields'
+import { htmlUtils } from '@heyform-inc/answer-utils'
 
-const ID = /^[A-Za-z0-9_-]{6,32}$/
-
-function field(overrides: Record<string, any> = {}): Record<string, any> {
-  return {
-    id: 'abcdefghijkl',
-    title: ['A question'],
-    description: [],
-    kind: 'short_text',
-    validations: {},
-    properties: {},
-    layout: null,
-    ...overrides
+const [field] = normalizeAIFields([
+  {
+    id: 'legal',
+    kind: 'legal_terms',
+    title: 'Consent',
+    placeholder: 'unsupported',
+    properties: {
+      html: '<p>Accept the <b>terms</b>.</p><script>alert(1)</script>',
+      invented: true,
+      choices: [{ id: 'choice', label: 'Yes', unknown: 1, score: 'wrong' }, 'No'],
+      tableColumns: [{ id: 'column', label: 'Name', required: true, unknown: true }],
+      price: { type: 'number', value: 10, invalid: true },
+      fields: [{ id: 'legal', kind: 'email', unknown: true, properties: { html: 'remove' } }]
+    },
+    validations: { required: true, min: 'wrong', max: 5, unknown: true },
+    layout: { mediaType: 'image', brightness: 200, align: 'unknown', html: 'remove' }
   }
-}
+])
 
-function only(raw: unknown): Record<string, any> {
-  const { fields } = sanitizeAIFields(raw)
-  assert.strictEqual(fields.length, 1, 'expected exactly one surviving field')
-  return fields[0]
-}
+assert.strictEqual(field.placeholder, undefined)
+assert.deepStrictEqual(field.title, ['Consent'])
+assert.strictEqual(
+  htmlUtils.serialize(field.description as any[]),
+  '<p>Accept the <b>terms</b>.</p>'
+)
+assert.deepStrictEqual(field.validations, { required: true, max: 5 })
+assert.deepStrictEqual(field.layout, { mediaType: 'image', brightness: 100 })
+const properties = field.properties as any
+assert.strictEqual(properties.html, undefined)
+assert.strictEqual(properties.invented, undefined)
+assert.deepStrictEqual(properties.choices[0], { id: 'choice', label: 'Yes' })
+assert.strictEqual(properties.choices[1].label, 'No')
+assert.strictEqual(properties.choices[1].id.length, 12)
+assert.deepStrictEqual(properties.tableColumns, [{ id: 'column', label: 'Name', required: true }])
+assert.deepStrictEqual(properties.price, { type: 'number', value: 10 })
+assert.notStrictEqual(properties.fields[0].id, field.id)
+assert.strictEqual(properties.fields[0].unknown, undefined)
+assert.deepStrictEqual(properties.fields[0].properties, {})
 
-// ── the invented keys #5 and #6 shipped prompt fixes for ────────────────────
-
-function testDropsUnknownValidationKeys() {
-  const out = only([
-    field({
-      kind: 'email',
-      validations: { required: true, format: 'email', max_length: 200, pattern: '.+' }
-    })
-  ])
-  assert.deepStrictEqual(out.validations, { required: true })
-}
-
-function testDropsUnknownPropertyKeys() {
-  const out = only([
-    field({
-      kind: 'file_upload',
-      properties: { allowed_file_types: ['pdf'], max_files: 3, badge: 'A' }
-    })
-  ])
-  assert.deepStrictEqual(out.properties, { badge: 'A' })
-}
-
-function testRecoversSnakeCaseKeysRatherThanDroppingThem() {
-  // `default_country_code` has a real camelCase counterpart, so the author's
-  // intent survives; a key with no counterpart is still dropped.
-  const out = only([
-    field({ kind: 'phone_number', properties: { default_country_code: 'GB', nonsense_key: 1 } })
-  ])
-  assert.strictEqual(out.properties.defaultCountryCode, 'GB')
-  assert.ok(!('nonsense_key' in out.properties))
-  assert.ok(!('nonsenseKey' in out.properties))
-}
-
-function testCoercesNonBooleanAndNonNumericValidations() {
-  const out = only([
-    field({ validations: { required: 'true', min: '50', max: 'lots', matchExpected: 'nope' } })
-  ])
-  assert.deepStrictEqual(out.validations, { required: true, min: 50 })
-}
-
-// ── string choices, the other shape the model reaches for ───────────────────
-
-function testCoercesStringChoicesToObjects() {
-  const out = only([field({ kind: 'multiple_choice', properties: { choices: ['Low', 'High'] } })])
-  assert.strictEqual(out.properties.choices.length, 2)
-  assert.deepStrictEqual(
-    out.properties.choices.map((c: any) => c.label),
-    ['Low', 'High']
-  )
-  for (const choice of out.properties.choices) {
-    assert.ok(ID.test(choice.id), `choice id ${choice.id} should be usable`)
+const [existingDescription] = normalizeAIFields([
+  {
+    kind: 'legal_terms',
+    description: ['Existing'],
+    properties: { html: '<p>Fallback</p>' }
   }
+])
+assert.deepStrictEqual(existingDescription.description, ['Existing'])
+
+const [upload] = normalizeAIFields([
+  { kind: 'file_upload', properties: { allowed_file_types: ['pdf'], max_files: 3 } }
+])
+assert.deepStrictEqual(upload.properties, {})
+
+for (const kind of FORM_FIELD_KINDS) {
+  assert.strictEqual(normalizeAIFields([{ kind }])[0].kind, kind)
 }
 
-function testCoercesStringTableColumns() {
-  const out = only([
-    field({ kind: 'input_table', properties: { tableColumns: ['Skill', 'Proficiency'] } })
-  ])
-  assert.deepStrictEqual(
-    out.properties.tableColumns.map((c: any) => c.label),
-    ['Skill', 'Proficiency']
+for (const kind of ['submit_date', 'hidden_fields', 'variable', 'hidden_checkbox', 'custom_text']) {
+  assert.throws(() => normalizeAIFields([{ kind }]), /Unsupported AI field kind/)
+  assert.throws(
+    () => normalizeAIFields([{ kind: 'group', properties: { fields: [{ kind }] } }]),
+    /Unsupported AI field kind/
   )
 }
 
-function testDropsChoicesWithNoLabel() {
-  const out = only([
-    field({
-      kind: 'multiple_choice',
-      properties: { choices: [{ id: 'aaaaaaaaaaaa', label: 'Real' }, { id: 'bbbbbbbbbbbb' }] }
-    })
-  ])
-  // One real choice survives; the labelless one is dropped, then the minimum of
-  // two is restored so the field still works in the builder.
-  assert.strictEqual(out.properties.choices.length, 2)
-  assert.strictEqual(out.properties.choices[0].label, 'Real')
-  assert.ok(out.properties.choices[1].label.length > 0)
+for (const value of [
+  null,
+  {},
+  [],
+  [null],
+  [{ kind: 'invented' }],
+  [{ kind: 'multiple_choice', properties: { choices: [{}] } }]
+]) {
+  assert.throws(() => normalizeAIFields(value))
 }
 
-// ── per-kind requirements ───────────────────────────────────────────────────
-
-function testFillsPerKindRequirements() {
-  const cases: Array<[string, (p: any) => void]> = [
-    [
-      'yes_no',
-      p =>
-        assert.deepStrictEqual(
-          p.choices.map((c: any) => c.label),
-          ['Yes', 'No']
-        )
-    ],
-    ['rating', p => assert.deepStrictEqual([p.total, p.shape], [5, 'star'])],
-    ['opinion_scale', p => assert.strictEqual(p.total, 10)],
-    ['date', p => assert.deepStrictEqual([p.format, p.allowTime], ['MM/DD/YYYY', false])],
-    ['date_range', p => assert.strictEqual(p.format, 'MM/DD/YYYY')],
-    ['phone_number', p => assert.strictEqual(p.defaultCountryCode, 'US')],
-    [
-      'payment',
-      p => assert.deepStrictEqual([p.currency, p.price], ['USD', { type: 'number', value: 0 }])
-    ],
-    ['input_table', p => assert.strictEqual(p.tableColumns.length, 2)],
-    [
-      'multiple_choice',
-      p => {
-        assert.strictEqual(p.choices.length, 2)
-        assert.strictEqual(p.allowMultiple, false)
-        assert.strictEqual(p.verticalAlignment, true)
-      }
-    ]
-  ]
-  for (const [kind, check] of cases) {
-    const out = only([field({ kind, properties: {} })])
-    assert.strictEqual(out.kind, kind)
-    try {
-      check(out.properties)
-    } catch (error) {
-      throw new Error(`kind "${kind}": ${(error as Error).message}`)
+// Invalid optional values must be discarded, never coerced or retained as undefined keys.
+for (const invalid of [null, undefined, {}, [], true, 1]) {
+  const [normalized] = normalizeAIFields([
+    {
+      kind: 'short_text',
+      properties: { buttonText: invalid },
+      layout: { mediaUrl: invalid }
     }
+  ])
+  assert.deepStrictEqual(normalized.properties, {})
+  assert.deepStrictEqual(normalized.layout, {})
+}
+for (const invalid of [null, undefined, {}, [], 'true', 0, 1]) {
+  const [normalized] = normalizeAIFields([
+    {
+      kind: 'short_text',
+      hide: invalid,
+      validations: { required: invalid },
+      properties: { allowMultiple: invalid }
+    }
+  ])
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(normalized, 'hide'), false)
+  assert.deepStrictEqual(normalized.validations, {})
+  assert.deepStrictEqual(normalized.properties, {})
+}
+for (const invalid of [null, undefined, {}, [], '10', true, NaN, Infinity, -Infinity]) {
+  const [normalized] = normalizeAIFields([
+    {
+      kind: 'short_text',
+      width: invalid,
+      validations: { min: invalid, max: invalid },
+      properties: { score: invalid, price: { type: 'number', value: invalid } },
+      layout: { brightness: invalid }
+    }
+  ])
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(normalized, 'width'), false)
+  assert.deepStrictEqual(normalized.validations, {})
+  assert.deepStrictEqual(normalized.properties, { price: { type: 'number' } })
+  assert.deepStrictEqual(normalized.layout, {})
+}
+
+const [falsy] = normalizeAIFields([
+  {
+    kind: 'short_text',
+    hide: false,
+    width: 0,
+    validations: { required: false, min: 0 },
+    properties: { buttonText: '', score: 0, allowMultiple: false, fields: [] },
+    layout: { mediaType: 'audio', align: '', brightness: -200 }
   }
-}
+])
+assert.strictEqual(falsy.hide, false)
+assert.strictEqual(falsy.width, 0)
+assert.deepStrictEqual(falsy.validations, { required: false, min: 0 })
+assert.deepStrictEqual(falsy.properties, {
+  buttonText: '',
+  score: 0,
+  allowMultiple: false,
+  fields: []
+})
+assert.deepStrictEqual(falsy.layout, { brightness: -100 })
 
-function testDoesNotInventPropertiesForKindsThatNeedNone() {
-  // file_upload has no configurable properties, and forcing `{}` on "every other
-  // kind" would strip legitimate shared ones — so this asserts both halves.
-  const bare = only([field({ kind: 'file_upload', properties: {} })])
-  assert.deepStrictEqual(bare.properties, {})
-
-  const shared = only([field({ kind: 'statement', properties: { showButton: true } })])
-  assert.strictEqual(shared.properties.showButton, true)
-}
-
-function testPreservesModelSuppliedPerKindValues() {
-  const out = only([field({ kind: 'rating', properties: { total: 3, shape: 'heart' } })])
-  assert.deepStrictEqual([out.properties.total, out.properties.shape], [3, 'heart'])
-}
-
-// ── ids: the constraint that makes this safe on createFieldsWithAI ──────────
-
-function testKeepsValidIdsSoLogicReferencesSurvive() {
-  const out = only([field({ id: 'keepThisId12' })])
-  assert.strictEqual(out.id, 'keepThisId12')
-}
-
-function testReplacesDuplicateAndMalformedIds() {
-  const { fields } = sanitizeAIFields([
-    field({ id: 'sameIdTwice1', title: ['One'] }),
-    field({ id: 'sameIdTwice1', title: ['Two'] }),
-    field({ id: '', title: ['Three'] }),
-    field({ id: 42 as any, title: ['Four'] })
-  ])
-  assert.strictEqual(fields.length, 4)
-  assert.strictEqual(fields[0].id, 'sameIdTwice1')
-  const ids = fields.map((f: any) => f.id)
-  assert.strictEqual(new Set(ids).size, 4, 'ids must be distinct')
-  for (const id of ids) assert.ok(ID.test(id), `id ${id} should be usable`)
-}
-
-// ── kind and title handling ─────────────────────────────────────────────────
-
-function testFallsBackToShortTextForUnknownKind() {
-  const out = only([field({ kind: 'signature_pad' })])
-  assert.strictEqual(out.kind, 'short_text')
-}
-
-function testNormalisesCamelCaseKind() {
-  const out = only([field({ kind: 'longText' })])
-  assert.strictEqual(out.kind, 'long_text')
-}
-
-function testWrapsStringTitle() {
-  const out = only([field({ title: 'Just a string' })])
-  assert.deepStrictEqual(out.title, ['Just a string'])
-}
-
-function testDropsQuestionWithNoTitleButKeepsStatement() {
-  const { fields } = sanitizeAIFields([
-    field({ title: [], kind: 'short_text' }),
-    field({ title: [], kind: 'thank_you' })
-  ])
-  assert.strictEqual(fields.length, 1)
-  assert.strictEqual(fields[0].kind, 'thank_you')
-}
-
-// ── hostile / malformed input must not throw ────────────────────────────────
-
-function testSurvivesGarbage() {
-  for (const input of [null, undefined, 42, 'a string', {}, [null], ['x'], [[]]]) {
-    const result = sanitizeAIFields(input as any)
-    assert.ok(Array.isArray(result.fields), `fields must be an array for ${JSON.stringify(input)}`)
-    assert.ok(Array.isArray(result.repairs))
-  }
-  assert.deepStrictEqual(sanitizeAIFields([]).fields, [])
-}
-
-function testNonObjectPropertiesAndValidations() {
-  const out = only([field({ validations: 'nope' as any, properties: [] as any })])
-  assert.deepStrictEqual(out.validations, {})
-  assert.deepStrictEqual(out.properties, {})
-}
-
-function testSanitisesNestedGroupChildren() {
-  const out = only([
-    field({
-      kind: 'group',
-      title: ['A group'],
-      properties: {
-        fields: [
-          field({ id: 'child1234567', kind: 'multiple_choice', properties: { choices: ['A'] } })
-        ]
-      }
-    })
-  ])
-  const child = out.properties.fields[0]
-  assert.strictEqual(child.kind, 'multiple_choice')
-  assert.strictEqual(child.properties.choices.length, 2, 'nested choices get the same padding')
-}
-
-// ── the repair log, which is the drift signal ───────────────────────────────
-
-function testReportsNoRepairsForCompliantOutput() {
-  const compliant = [
-    field({ kind: 'email', validations: { required: true } }),
-    field({
-      id: 'secondField1',
-      kind: 'multiple_choice',
-      properties: {
-        allowMultiple: false,
-        verticalAlignment: true,
-        choices: [
-          { id: 'choiceOne123', label: 'A' },
-          { id: 'choiceTwo123', label: 'B' }
-        ]
-      }
-    })
-  ]
-  const { fields, repairs } = sanitizeAIFields(compliant)
-  assert.strictEqual(fields.length, 2)
-  assert.deepStrictEqual(repairs, [], `compliant output must need no repairs, got: ${repairs}`)
-}
-
-function testReportsWhatItRepaired() {
-  const { repairs } = sanitizeAIFields([field({ kind: 'email', validations: { format: 'email' } })])
-  assert.ok(
-    repairs.some(r => r.includes('format')),
-    `expected a repair mentioning "format", got: ${JSON.stringify(repairs)}`
-  )
-}
-
-// ── kind aliases and layout blocks (unicef/supporthub#363) ─────────────────
-
-function testMapsSingleChoiceToMultipleChoicePickOne() {
-  const out = only([
-    field({ kind: 'single_choice', properties: { choices: ['Yes, always', 'Sometimes', 'Never'] } })
-  ])
-  assert.strictEqual(out.kind, 'multiple_choice')
-  assert.strictEqual(out.properties.allowMultiple, false)
-  assert.strictEqual(out.properties.choices.length, 3)
-}
-
-function testForcesPickOneEvenWhenTheInputClaimsOtherwise() {
-  // A single_choice asserting allowMultiple is contradicting its own name.
-  const out = only([
-    field({
-      kind: 'single_choice',
-      properties: { allowMultiple: true, choices: ['A', 'B'] }
-    })
-  ])
-  assert.strictEqual(out.properties.allowMultiple, false)
-}
-
-function testMapsParagraphToLongText() {
-  const out = only([field({ kind: 'paragraph' })])
-  assert.strictEqual(out.kind, 'long_text')
-}
-
-function testMapsDropdownToMultipleChoiceWithoutInventingChoiceStyle() {
-  const out = only([field({ kind: 'dropdown', properties: { choices: ['A', 'B'] } })])
-  assert.strictEqual(out.kind, 'multiple_choice')
-  assert.strictEqual(out.properties.allowMultiple, false)
-  // choiceStyle has no documented value in this repo; inventing one is the bug
-  // this module exists to prevent.
-  assert.ok(!('choiceStyle' in out.properties), 'must not invent a choiceStyle')
-}
-
-function testDropsLayoutBlocks() {
-  const { fields, repairs } = sanitizeAIFields([
-    field({ title: ['Real question'] }),
-    { id: 'layoutBlock1', kind: 'text' },
-    { id: 'layoutBlock2', kind: 'separator' },
-    { id: 'layoutBlock3', kind: 'page_break' }
-  ])
-  assert.strictEqual(fields.length, 1)
-  assert.strictEqual(fields[0].title[0], 'Real question')
-  // Reported as layout, not as "no usable title" — the distinction is what tells
-  // a reader whether anything was actually lost.
-  for (const kind of ['text', 'separator', 'page_break']) {
-    assert.ok(
-      repairs.some(r => r.includes(`dropped "${kind}" layout block`)),
-      `expected a layout repair for ${kind}, got: ${JSON.stringify(repairs)}`
+for (const invalid of [false, 0, '', {}, [null], [false], [{}], [{ label: 1 }]]) {
+  for (const key of ['choices', 'tableColumns']) {
+    assert.throws(() =>
+      normalizeAIFields([{ kind: 'multiple_choice', properties: { [key]: invalid } }])
     )
   }
-  assert.ok(!repairs.some(r => r.includes('no usable title')))
 }
-
-function testAliasReportedAsMappingNotAsUnknownKind() {
-  const { repairs } = sanitizeAIFields([field({ kind: 'paragraph' })])
-  assert.ok(repairs.some(r => r.includes('mapped kind "paragraph" to "long_text"')))
-  assert.ok(
-    !repairs.some(r => r.includes('unknown kind')),
-    'a known alias must not be reported as an unknown kind'
+for (const invalid of [false, 0, '', [], {}, { type: null }, { type: 1 }]) {
+  assert.throws(
+    () => normalizeAIFields([{ kind: 'payment', properties: { price: invalid } }]),
+    /AI price must have a type/
+  )
+}
+for (const invalid of [false, 0, '', {}]) {
+  assert.throws(
+    () => normalizeAIFields([{ kind: 'group', properties: { fields: invalid } }]),
+    /AI fields must be a nonempty array/
   )
 }
 
-function testStillFallsBackForGenuinelyUnknownKinds() {
-  // The alias map must not swallow the fallback — an unrecognised kind still
-  // has to be reported as unknown so drift stays visible.
-  const { repairs } = sanitizeAIFields([field({ kind: 'carrier_pigeon' })])
-  assert.ok(repairs.some(r => r.includes('unknown kind')))
-}
+const [nullable] = normalizeAIFields([
+  { kind: 'group', properties: { choices: null, tableColumns: null, price: null, fields: null } }
+])
+assert.deepStrictEqual(nullable.properties, {})
+assert.strictEqual(nullable.layout, null)
 
-function testExplicitNullsAreDroppedSilently() {
-  // A null key means "not set". Reporting it as a repair would bury the repairs
-  // that matter — the template gallery ships 1,244 fields of all-null defaults.
-  const { fields, repairs } = sanitizeAIFields([
-    field({
-      kind: 'short_text',
-      validations: { required: true, min: null, max: null, matchExpected: null },
-      properties: { showButton: null, buttonText: null, price: null, currency: null }
-    })
-  ])
-  assert.deepStrictEqual(fields[0].validations, { required: true })
-  assert.deepStrictEqual(fields[0].properties, {})
-  assert.deepStrictEqual(repairs, [], `nulls must be silent, got: ${JSON.stringify(repairs)}`)
-}
-
-function run() {
-  testDropsUnknownValidationKeys()
-  testDropsUnknownPropertyKeys()
-  testRecoversSnakeCaseKeysRatherThanDroppingThem()
-  testCoercesNonBooleanAndNonNumericValidations()
-  testCoercesStringChoicesToObjects()
-  testCoercesStringTableColumns()
-  testDropsChoicesWithNoLabel()
-  testFillsPerKindRequirements()
-  testDoesNotInventPropertiesForKindsThatNeedNone()
-  testPreservesModelSuppliedPerKindValues()
-  testKeepsValidIdsSoLogicReferencesSurvive()
-  testReplacesDuplicateAndMalformedIds()
-  testFallsBackToShortTextForUnknownKind()
-  testNormalisesCamelCaseKind()
-  testWrapsStringTitle()
-  testDropsQuestionWithNoTitleButKeepsStatement()
-  testSurvivesGarbage()
-  testNonObjectPropertiesAndValidations()
-  testSanitisesNestedGroupChildren()
-  testReportsNoRepairsForCompliantOutput()
-  testReportsWhatItRepaired()
-  testMapsSingleChoiceToMultipleChoicePickOne()
-  testForcesPickOneEvenWhenTheInputClaimsOtherwise()
-  testMapsParagraphToLongText()
-  testMapsDropdownToMultipleChoiceWithoutInventingChoiceStyle()
-  testDropsLayoutBlocks()
-  testAliasReportedAsMappingNotAsUnknownKind()
-  testStillFallsBackForGenuinelyUnknownKinds()
-  testExplicitNullsAreDroppedSilently()
-}
-
-if (require.main === module) {
-  try {
-    run()
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(error)
-    process.exitCode = 1
-  }
-}
+const duplicateIds = normalizeAIFields([
+  {
+    id: 'shared',
+    kind: 'group',
+    properties: {
+      fields: [{ id: 'shared', kind: 'email' }],
+      choices: [{ id: 'choice', label: 'One' }, { id: 'choice', label: 'Two' }, 'Three']
+    }
+  },
+  { id: 'shared', kind: 'short_text' },
+  { id: '', kind: 'short_text' },
+  { id: 123, kind: 'short_text' }
+])
+assert.strictEqual(duplicateIds[0].id, 'shared')
+const allIds = duplicateIds
+  .map(item => item.id)
+  .concat((duplicateIds[0].properties as any).fields[0].id)
+assert.strictEqual(new Set(allIds).size, allIds.length)
+const choiceIds = (duplicateIds[0].properties as any).choices.map(item => item.id)
+assert.strictEqual(choiceIds[0], 'choice')
+assert.strictEqual(new Set(choiceIds).size, choiceIds.length)
+assert.deepStrictEqual(normalizeAIFields(duplicateIds), duplicateIds)

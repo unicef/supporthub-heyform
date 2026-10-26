@@ -6,8 +6,9 @@ import {
   SubmissionStatusEnum,
   Variable
 } from '@heyform-inc/shared-types-enums'
-import { BadRequestException, UseGuards } from '@nestjs/common'
+import { BadRequestException, Headers, UseGuards } from '@nestjs/common'
 
+import { DISABLE_SUBMISSION_IP } from '@environments'
 import { CompleteSubmissionInput, CompleteSubmissionType } from '@graphql'
 import { EndpointAnonymousIdGuard } from '@guard'
 import { applyLogicToFields, fieldValuesToAnswers, flattenFields } from '@heyform-inc/answer-utils'
@@ -22,7 +23,15 @@ import {
   SubmissionIpLimitService,
   SubmissionService
 } from '@service'
-import { ClientInfo, GqlClient } from '@utils'
+import {
+  ClientInfo,
+  GqlClient,
+  assertFormIsAcceptingSubmissions,
+  assertSafeSpecialFieldAnswers,
+  normalizeSubmissionHiddenFields,
+  resolvePaymentConfiguration,
+  selectSubmissionFields
+} from '@utils'
 
 @Resolver()
 @UseGuards(EndpointAnonymousIdGuard)
@@ -40,6 +49,7 @@ export class CompleteSubmissionResolver {
   @Mutation(returns => CompleteSubmissionType)
   async completeSubmission(
     @GqlClient() client: ClientInfo,
+    @Headers('x-anonymous-id') anonymousId: string,
     @Args('input') input: CompleteSubmissionInput
   ): Promise<CompleteSubmissionType> {
     const form = await this.formService.findById(input.formId)
@@ -56,22 +66,11 @@ export class CompleteSubmissionResolver {
       throw new BadRequestException('The form does not active')
     }
 
+    const now = timestamp()
+    assertFormIsAcceptingSubmissions(form.settings, now)
+
     if (helper.isEmpty(form!.fields)) {
       throw new BadRequestException('The form does not have content')
-    }
-
-    if (
-      form.settings.enableQuotaLimit &&
-      helper.isValid(form.settings.quotaLimit) &&
-      form.settings.quotaLimit > 0
-    ) {
-      const count = await this.submissionService.countInForm(input.formId)
-
-      if (count >= form.settings.quotaLimit) {
-        throw new BadRequestException(
-          'The submission quota exceeds, new submissions are no longer accepted'
-        )
-      }
     }
 
     if (
@@ -84,15 +83,25 @@ export class CompleteSubmissionResolver {
 
     // Check password
     if (form.settings.requirePassword) {
-      const { password } = this.endpointService.decryptToken(input.passwordToken)
-
-      if (password !== form.settings.password) {
-        throw new BadRequestException('The password does not match')
-      }
+      const passwordToken = this.endpointService.decryptToken(input.passwordToken)
+      this.endpointService.assertFormPasswordToken(
+        passwordToken,
+        form.id,
+        anonymousId,
+        form.settings.password!,
+        now
+      )
     }
 
     // Start submit time
-    const { timestamp: startAt } = this.endpointService.decryptToken(input.openToken)
+    const openToken = this.endpointService.decryptToken(input.openToken)
+
+    const startAt = this.endpointService.assertOpenToken(
+      openToken,
+      input.formId,
+      form.settings,
+      now
+    )
 
     // Bot prevention check
     if (form.settings?.captchaKind !== CaptchaKindEnum.NONE) {
@@ -102,16 +111,25 @@ export class CompleteSubmissionResolver {
     // Verify user submit content
     let answers: Answer[] = []
     let variables: Variable[] = []
+    let variableValues: Record<string, any> = {}
 
     try {
-      const { fields, variables: variableValues } = applyLogicToFields(
-        flattenFields(form.fields, true),
+      const flattenedFields = flattenFields(form.fields, true)
+      const logicResult = applyLogicToFields(
+        flattenedFields,
         form.logics,
         form.variables,
         input.answers
       )
+      const fields = selectSubmissionFields(
+        logicResult.fields,
+        form.logics,
+        input.partialSubmission === true
+      )
+      assertSafeSpecialFieldAnswers(fields, input.answers)
+      variableValues = logicResult.variables
 
-      answers = fieldValuesToAnswers(fields, input.answers, input.partialSubmission)
+      answers = fieldValuesToAnswers(fields, input.answers)
       variables = form.variables?.map(variable => ({
         ...variable,
         value: variableValues[variable.id]
@@ -143,41 +161,59 @@ export class CompleteSubmissionResolver {
 
     const endAt = timestamp()
 
-    const submissionId = await this.submissionService.create({
-      teamId: form.teamId,
-      formId: form.id,
-      category,
-      title: form.name,
-      answers,
-      hiddenFields: input.hiddenFields,
-      variables,
-      startAt,
-      endAt,
-      ip: client.ip,
-      userAgent: client.userAgent,
-      status
-    })
+    // Payment amounts and currencies are always derived from the published form
+    // configuration, never from respondent-controlled answer values.
+    const paymentAnswers = answers.filter(answer => answer.kind === FieldKindEnum.PAYMENT)
+
+    for (const paymentAnswer of paymentAnswers) {
+      const payment = resolvePaymentConfiguration(paymentAnswer.properties, variableValues)
+      const billingName = paymentAnswer.value?.billingDetails?.name
+
+      paymentAnswer.value = {
+        ...payment,
+        billingDetails: {
+          name: typeof billingName === 'string' ? billingName : ''
+        }
+      }
+    }
+
+    const paymentAnswer = paymentAnswers[0]
+
+    const quotaLimit =
+      form.settings.enableQuotaLimit &&
+      helper.isValid(form.settings.quotaLimit) &&
+      form.settings.quotaLimit! > 0
+        ? form.settings.quotaLimit
+        : undefined
+    const submissionId = await this.submissionService.createWithinQuota(
+      {
+        teamId: form.teamId,
+        formId: form.id,
+        category,
+        title: form.name,
+        answers,
+        hiddenFields: normalizeSubmissionHiddenFields(form.hiddenFields, input.hiddenFields),
+        variables,
+        startAt,
+        endAt,
+        ip: DISABLE_SUBMISSION_IP ? undefined : client.ip,
+        userAgent: client.userAgent,
+        status
+      },
+      quotaLimit
+    )
 
     // Payment
-    const answer = answers.find(a => a.kind === FieldKindEnum.PAYMENT)
     const result: CompleteSubmissionType = {}
 
-    if (helper.isValid(answer) && helper.isValid(form.stripeAccount)) {
+    if (helper.isValid(paymentAnswer) && helper.isValid(form.stripeAccount)) {
       result.clientSecret = await this.paymentService.createPaymentIntent({
-        amount: answer.value.amount,
-        currency: answer.value.currency,
+        amount: paymentAnswer.value.amount,
+        currency: paymentAnswer.value.currency,
         stripeAccountId: form.stripeAccount.accountId,
         metadata: {
           submissionId,
-          fieldId: answer.id
-        }
-      })
-
-      await this.submissionService.updateAnswer(submissionId, {
-        ...answer,
-        value: {
-          ...answer.value,
-          clientSecret: result.clientSecret
+          fieldId: paymentAnswer.id
         }
       })
     }

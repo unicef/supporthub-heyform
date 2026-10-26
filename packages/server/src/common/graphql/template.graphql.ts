@@ -1,14 +1,22 @@
-import { FormField, FormKindEnum, InteractiveModeEnum } from '@heyform-inc/shared-types-enums'
-import { IsOptional, Max } from 'class-validator'
+import {
+  FormField,
+  FormKindEnum,
+  FormModel,
+  InteractiveModeEnum
+} from '@heyform-inc/shared-types-enums'
+import { IsOptional, IsString, Max, MaxLength } from 'class-validator'
 
 import { FormFieldType, ThemeSettingsType } from './form.graphql'
 import { ProjectDetailInput } from './project.graphql'
 import { Field, InputType, ObjectType } from '@nestjs/graphql'
+import { GraphQLJSONObject } from 'graphql-type-json'
 
 @InputType()
 export class TemplatesInput {
   @Field({ nullable: true })
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
   keyword?: string
 
   @Field({ nullable: true })
@@ -70,6 +78,15 @@ export class TemplateType {
 
 @ObjectType()
 export class TemplateDetailType extends TemplateType {
+  @Field(type => [GraphQLJSONObject], { nullable: true })
+  logics?: FormModel['logics']
+
+  @Field(type => [GraphQLJSONObject], { nullable: true })
+  variables?: FormModel['variables']
+
+  @Field(type => GraphQLJSONObject, { nullable: true })
+  translations?: FormModel['translations']
+
   @Field(type => [FormFieldType], { nullable: true })
   fields?: FormField[]
 

@@ -13,6 +13,7 @@ const commonOptions = {
 export const COOKIE_SESSION_NAME = 'HEYFORM_SESSION'
 export const COOKIE_LOGIN_IN_NAME = 'HEYFORM_LOGGED_IN'
 export const COOKIE_DEVICE_ID_NAME = 'HEYFORM_DEVICE_ID'
+export const COOKIE_INVITATION_NAME = 'HEYFORM_INVITATION'
 
 export function CookieOptionsFactory(options?: CookieOptions): CookieOptions {
   return {

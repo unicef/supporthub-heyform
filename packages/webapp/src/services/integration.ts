@@ -25,6 +25,9 @@ import {
   GOOGLE_SHEETS_LIST_GQL,
   GOOGLE_SHEETS_WORKSHEETS_GQL,
   HUBSPOT_OAUTH_GQL,
+  INTEGRATION_CONNECTIONS_GQL,
+  INTEGRATION_RECORDS_GQL,
+  INTEGRATION_SETTING_OPTIONS_GQL,
   INTEGRATION_STATUS_ENUM,
   MAILCHIMP_AUDIENCES_GQL,
   MAILCHIMP_OAUTH_GQL,
@@ -82,14 +85,61 @@ export class IntegrationService {
     })
   }
 
-  static async updateSettings(formId: string, appId: string, config: AnyMap) {
+  static async updateSettings(
+    formId: string,
+    appId: string,
+    config: AnyMap,
+    apiKey?: string,
+    connectionId?: string
+  ) {
     return apollo.mutate({
       mutation: UPDATE_INTEGRATION_SETTINGS_GQL,
       variables: {
         input: {
           formId,
           appId,
-          config
+          config,
+          apiKey,
+          connectionId
+        }
+      }
+    })
+  }
+
+  // Options of a select setting that loads them, for the values in the form
+  static async settingOptions(
+    formId: string,
+    appId: string,
+    setting: string,
+    config: AnyMap,
+    apiKey?: string,
+    connectionId?: string
+  ) {
+    return apollo.query({
+      query: INTEGRATION_SETTING_OPTIONS_GQL,
+      fetchPolicy: 'no-cache',
+      variables: {
+        input: {
+          formId,
+          appId,
+          setting,
+          config,
+          apiKey,
+          connectionId
+        }
+      }
+    })
+  }
+
+  // The team's accounts the app can use
+  static async connections(formId: string, appId: string) {
+    return apollo.query({
+      query: INTEGRATION_CONNECTIONS_GQL,
+      fetchPolicy: 'no-cache',
+      variables: {
+        input: {
+          formId,
+          appId
         }
       }
     })
@@ -103,6 +153,19 @@ export class IntegrationService {
           formId,
           appId,
           status
+        }
+      }
+    })
+  }
+
+  static async records(formId: string, appId: string) {
+    return apollo.query({
+      query: INTEGRATION_RECORDS_GQL,
+      fetchPolicy: 'no-cache',
+      variables: {
+        input: {
+          formId,
+          appId
         }
       }
     })

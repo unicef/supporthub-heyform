@@ -30,11 +30,9 @@ export class PublicTeamDetailResolver {
       owner
     }
 
-    if (team.inviteCode !== input.inviteCode) {
-      return detail
-    }
+    const invitation = await this.teamService.findJoinableByInvite(input.teamId, input.inviteCode)
 
-    if (team.allowJoinByInviteLink) {
+    if (invitation) {
       detail.allowJoinByInviteLink = true
     }
 

@@ -1,8 +1,8 @@
 import { BadRequestException } from '@nestjs/common'
 
-import { Auth, ProjectGuard, Team } from '@decorator'
+import { Auth, Project, ProjectGuard, Team } from '@decorator'
 import { ProjectMemberInput } from '@graphql'
-import { TeamModel } from '@model'
+import { ProjectModel, TeamModel, TeamRoleEnum } from '@model'
 import { Args, Mutation, Resolver } from '@nestjs/graphql'
 import { ProjectService } from '@service'
 
@@ -15,9 +15,20 @@ export class DeleteProjectMemberResolver {
   @Mutation(returns => Boolean)
   async deleteProjectMember(
     @Team() team: TeamModel,
+    @Project() project: ProjectModel,
     @Args('input') input: ProjectMemberInput
   ): Promise<boolean> {
-    if (input.memberId === team.ownerId) {
+    const canManageMembers =
+      team.isOwner ||
+      project.isOwner ||
+      (team as TeamModel & { role?: TeamRoleEnum }).role === TeamRoleEnum.OWNER ||
+      (team as TeamModel & { role?: TeamRoleEnum }).role === TeamRoleEnum.ADMIN
+
+    if (!canManageMembers) {
+      throw new BadRequestException("You don't have permission to manage project members")
+    }
+
+    if (input.memberId === team.ownerId || input.memberId === project.ownerId) {
       throw new BadRequestException("You don't have permission to remove member from the project")
     }
 

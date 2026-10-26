@@ -2,13 +2,17 @@ import { getTheme, getThemeStyle } from '@heyform-inc/form-renderer'
 import { FormTheme } from '@heyform-inc/shared-types-enums'
 
 import { isMobilePhone } from '@heyform-inc/answer-utils'
-import { helper, qs, removeObjectNil } from '@heyform-inc/utils'
+import { helper } from '@heyform-inc/utils'
 
 import { STRIPE_PUBLISHABLE_KEY } from '@/consts'
 
-export function urlBuilder(prefix: string, query: Record<string, any>): string {
-  return prefix + '?' + qs.stringify(removeObjectNil(query), { encode: true })
-}
+export {
+  getFileUploadValue,
+  isAllowedUrlOrigin,
+  isHttpUrl,
+  isTrustedStripeReceiptUrl,
+  urlBuilder
+} from './file-upload'
 
 const LOADED_SCRIPTS = new Set<string>()
 
@@ -80,7 +84,7 @@ export function insertStyle(id: string, style: string) {
     document.head.appendChild(styleElement)
   }
 
-  styleElement.innerHTML = style
+  styleElement.textContent = style
 }
 
 export function isPhoneNumber(arg: any): boolean {
@@ -137,25 +141,7 @@ export function insertThemeStyle(customTheme?: FormTheme) {
     content += customTheme!.customCSS
   }
 
-  style.innerHTML = content
-}
-
-export function getFileUploadValue(v: any) {
-  if (helper.isObject(v) && helper.isURL(v.url)) {
-    return {
-      filename: v.filename,
-      url: urlBuilder(v.url, {
-        attname: v.filename
-      })
-    }
-  } else if (helper.isString(v) && helper.isURL(v)) {
-    return {
-      filename: 'Attachment',
-      url: urlBuilder(v, {
-        attname: 'Attachment'
-      })
-    }
-  }
+  style.textContent = content
 }
 
 export function getUrlValue(v: any) {

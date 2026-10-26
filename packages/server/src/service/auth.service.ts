@@ -21,6 +21,7 @@ import {
 import {
   helper,
   hs,
+  ms,
   isDateExpired,
   nanoid,
   parseNumber,
@@ -56,7 +57,13 @@ const DEFAULT_ATTEMPTS_OPTIONS = {
 }
 const NUMERIC_ALPHABET = '0123456789'
 const OAUTH_STATE_COOKIE_NAME = 'HEYFORM_OAUTH_STATE'
-const OAUTH_STATE_MAX_AGE = hs('10m')
+const OAUTH_STATE_MAX_AGE = ms('10m')
+const OAUTH_TRANSACTION_TTL = '10m'
+
+export interface OAuthTransaction {
+  codeVerifier: string
+  nonce: string
+}
 
 @Injectable()
 export class AuthService {
@@ -118,6 +125,46 @@ export class AuthService {
     return state
   }
 
+  async storeOAuthTransaction(state: string, transaction: OAuthTransaction): Promise<void> {
+    if (
+      helper.isEmpty(state) ||
+      helper.isEmpty(transaction?.codeVerifier) ||
+      helper.isEmpty(transaction?.nonce)
+    ) {
+      throw new BadRequestException('Invalid OAuth transaction')
+    }
+
+    await this.redisService.set({
+      key: `oauth_transaction:${state}`,
+      value: JSON.stringify(transaction),
+      duration: OAUTH_TRANSACTION_TTL
+    })
+  }
+
+  async consumeOAuthTransaction(state?: string): Promise<OAuthTransaction> {
+    if (helper.isEmpty(state)) {
+      throw new BadRequestException('Invalid OAuth transaction')
+    }
+
+    const value = await this.redisService.getdel(`oauth_transaction:${state}`)
+
+    if (helper.isEmpty(value)) {
+      throw new BadRequestException('Invalid OAuth transaction')
+    }
+
+    try {
+      const transaction = JSON.parse(value!) as OAuthTransaction
+
+      if (helper.isEmpty(transaction.codeVerifier) || helper.isEmpty(transaction.nonce)) {
+        throw new Error('Incomplete OAuth transaction')
+      }
+
+      return transaction
+    } catch (_) {
+      throw new BadRequestException('Invalid OAuth transaction')
+    }
+  }
+
   async verifyOAuthState(req: any, res: any, state?: string): Promise<void> {
     const cookieState = req.cookies?.[OAUTH_STATE_COOKIE_NAME]
 
@@ -126,7 +173,7 @@ export class AuthService {
     }
 
     const key = `oauth_state:${state}`
-    const deviceId = await this.redisService.get(key)
+    const deviceId = await this.redisService.getdel(key)
 
     if (helper.isEmpty(deviceId)) {
       throw new BadRequestException('Invalid OAuth state')
@@ -141,7 +188,6 @@ export class AuthService {
       [COOKIE_DEVICE_ID_NAME]: deviceId
     }
 
-    await this.redisService.del(key)
     res.clearCookie(
       OAUTH_STATE_COOKIE_NAME,
       CookieOptionsFactory({
@@ -278,22 +324,19 @@ export class AuthService {
       ...customOptions
     }
 
-    const cache = await this.redisService.get(key)
-    const remaining = options.max - parseNumber(cache, 0)
+    // Reserve the attempt before checking the credential. The Redis operation is atomic, so a
+    // concurrent burst cannot have every request observe the same stale counter value.
+    const count = await this.redisService.incrementWithExpiry(key, options.expire)
 
-    if (remaining < 1) {
+    if (count > options.max) {
       throw new ForbiddenException('Limit exceeded. Please try again later.')
     }
 
-    try {
-      await checkFunc()
-    } catch (err: unknown) {
-      await this.redisService.multi([
-        ['incr', key],
-        ['expire', key, String(hs(options.expire))]
-      ])
-      throw err
-    }
+    await checkFunc()
+  }
+
+  async clearAttempts(key: string): Promise<void> {
+    await this.redisService.del(key)
   }
 
   async getVerificationCode(
@@ -367,7 +410,7 @@ export class AuthService {
   }
 
   async checkVerificationCode(key: string, code: string): Promise<void> {
-    const cache = await this.redisService.hget({
+    const cache = await this.redisService.hgetdel({
       key,
       field: code
     })

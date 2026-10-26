@@ -1,4 +1,12 @@
-import { htmlUtils } from '@heyform-inc/answer-utils'
+import { FieldKindEnum, FormField, Logic } from '@heyform-inc/shared-types-enums'
+import { BadRequestException, HttpStatus } from '@nestjs/common'
+
+import {
+  createFieldNavigation,
+  flattenFields,
+  getChoiceBranchingErrors,
+  htmlUtils
+} from '@heyform-inc/answer-utils'
 
 const ALLOWED_BLOCK_TAGS = ['div', 'h1', 'h2', 'h3', 'p', 'br']
 const ALLOWED_TAGS = [
@@ -26,15 +34,32 @@ const ALLOWED_ATTRIBUTES = [
   'contenteditable',
   'id'
 ]
-const UNSAFE_URL_PROTOCOL_REGEX = /^\s*(?:javascript|vbscript|data):/i
+const UNSAFE_URL_PROTOCOLS = new Set(['javascript', 'vbscript', 'data'])
+const URL_PROTOCOL_CONTROL_CHARS_REGEX = /[\u0000-\u001f\u007f\s]+/g
+const UNSAFE_CUSTOM_CSS_REGEX = /[<>\u0000]/
+const UNSAFE_CSS_VALUE_REGEX = /[<>{};]/
+
+function isUnsafeUrlProtocol(value: unknown): boolean {
+  const matched = String(value || '')
+    .trimStart()
+    .match(/^([^:]+):/)
+
+  if (!matched) {
+    return false
+  }
+
+  const protocol = matched[1].replace(URL_PROTOCOL_CONTROL_CHARS_REGEX, '').toLowerCase()
+  return UNSAFE_URL_PROTOCOLS.has(protocol)
+}
 
 function escapeText(value: unknown): string {
   return String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function escapeAttribute(value: unknown): string {
+  // Drafts pass through this sanitizer again on save and publish.
   return String(value)
-    .replace(/&/g, '&amp;')
+    .replace(/&(?!(?:amp|quot|lt|gt);)/g, '&amp;')
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -50,7 +75,7 @@ function sanitizeAttributes(attributes: Record<string, any> = {}): Record<string
 
     const value = String(attributes[key] || '')
 
-    if (key === 'href' && UNSAFE_URL_PROTOCOL_REGEX.test(value)) {
+    if (key === 'href' && isUnsafeUrlProtocol(value)) {
       continue
     }
 
@@ -98,7 +123,7 @@ function sanitizeRichTextNodes(nodes: unknown[]): any[] {
   return nodes.map(sanitizeRichTextNode).filter(Boolean)
 }
 
-function sanitizeRichTextSchema(value: unknown): any[] {
+export function sanitizeRichTextSchema(value: unknown): any[] {
   if (Array.isArray(value)) {
     return sanitizeRichTextNodes(value)
   }
@@ -133,4 +158,84 @@ function sanitizeField(field: Record<string, any>): Record<string, any> {
 
 export function sanitizeFormDrafts(drafts: any[]): any[] {
   return drafts.map(sanitizeField)
+}
+
+function hasNextFieldIds(fields: FormField[] = []): boolean {
+  return fields.some(
+    field => field.nextFieldId != null || hasNextFieldIds(field.properties?.fields)
+  )
+}
+
+export function assertValidFormNavigation(drafts: FormField[]): void {
+  // Forms without explicit destinations navigate in form order as before, so
+  // leave their existing structure alone.
+  if (!hasNextFieldIds(drafts)) {
+    return
+  }
+
+  // The renderer supports one group level. Reject unsupported nesting instead
+  // of accepting destinations that neither renderer nor submission can traverse.
+  for (const field of drafts) {
+    if (field.properties?.fields?.some(child => child.kind === FieldKindEnum.GROUP)) {
+      throw new BadRequestException('Nested question groups are not supported')
+    }
+  }
+  const fields = flattenFields(drafts, true)
+  const navigation = createFieldNavigation(fields)
+  const ids = new Set<string>()
+
+  for (const field of fields) {
+    if (ids.has(field.id)) {
+      throw new BadRequestException('Field IDs must be unique')
+    }
+    ids.add(field.id)
+    if (
+      field.nextFieldId != null &&
+      (typeof field.nextFieldId !== 'string' ||
+        !navigation.isValidNextFieldId(field.id, field.nextFieldId))
+    ) {
+      throw new BadRequestException(
+        'The next question must be a later question or ending in this form'
+      )
+    }
+  }
+}
+
+// Drafts may be mid-edit, so this only runs when publishing.
+export function assertValidChoiceBranching(drafts: FormField[], logics?: Logic[]): void {
+  const fields = flattenFields(drafts, true)
+  const [error] = getChoiceBranchingErrors(fields, logics)
+
+  if (error) {
+    const field = fields.find(f => f.id === error.fieldId)
+    // Sanitized drafts store titles as rich-text schemas rather than HTML.
+    const html = Array.isArray(field?.title)
+      ? htmlUtils.serialize(field!.title)
+      : String(field?.title || '')
+    const title = htmlUtils.plain(html).trim() || error.fieldId
+
+    throw new BadRequestException({
+      statusCode: HttpStatus.BAD_REQUEST,
+      error: 'invalid_choice_branching',
+      message: `"${title}" branches by answer, so it must be required, single-select, and every answer needs a destination`,
+      fieldId: error.fieldId,
+      code: error.code
+    })
+  }
+}
+
+export function isSafeCustomCSS(value?: string): boolean {
+  if (value === undefined || value === null || value === '') {
+    return true
+  }
+
+  return !UNSAFE_CUSTOM_CSS_REGEX.test(value)
+}
+
+export function isSafeCSSValue(value?: string): boolean {
+  if (value === undefined || value === null || value === '') {
+    return true
+  }
+
+  return !UNSAFE_CSS_VALUE_REGEX.test(value) && !value.includes('\u0000')
 }

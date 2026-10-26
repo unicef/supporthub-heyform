@@ -1,3 +1,4 @@
+import { FormStatusEnum } from '@heyform-inc/shared-types-enums'
 import { Process, Processor } from '@nestjs/bull'
 
 import {
@@ -32,35 +33,37 @@ export class DeleteUserAccountSchedule extends BaseQueue {
       for (const user of users) {
         const userId = user.id
 
-        // Delete user
-        await this.userService.delete(userId)
-
-        // Delete user's social login accounts
-        await this.socialLoginService.deleteByUserId(userId)
-
         const teams = await this.teamService.findAll(userId)
 
         for (const team of teams) {
           const teamId = team.id
 
           if (team.ownerId === userId) {
-            await this.teamService.delete(teamId)
-            await this.teamService.deleteAllMemberInTeam(teamId)
-
             const forms = await this.formService.findAllInTeam(teamId)
             const formIds = forms.map(form => form.id)
 
             if (formIds.length > 0) {
-              await this.formService.delete(formIds)
+              await this.formService.updateMany(formIds, {
+                'settings.active': false,
+                status: FormStatusEnum.TRASH
+              })
               await this.submissionService.deleteAll(formIds)
+              await this.formService.delete(formIds)
             }
+
+            await this.teamService.deleteAllMemberInTeam(teamId)
+            await this.teamService.delete(teamId)
           } else {
             // Leave from team
             await this.teamService.deleteMember(teamId, userId)
           }
-
-          await this.mailService.accountDeletionAlert(user.email, user.lang)
         }
+
+        // Delete user's social login accounts before deleting the user itself.
+        await this.socialLoginService.deleteByUserId(userId)
+        await this.userService.delete(userId)
+
+        await this.mailService.accountDeletionAlert(user.email, user.lang)
       }
     }
   }

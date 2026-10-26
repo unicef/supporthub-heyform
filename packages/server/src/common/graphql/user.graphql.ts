@@ -45,6 +45,9 @@ export class ChangeEmailCodeInput {
 export class UpdateEmailInput extends ChangeEmailCodeInput {
   @Field()
   code: string
+
+  @Field()
+  currentPassword: string
 }
 
 @InputType()

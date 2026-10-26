@@ -26,6 +26,16 @@ test('serialize html', () => {
   expect(htmlUtils.serialize(schema, { allowedBlockTags: [] })).toMatchSnapshot()
 })
 
+test('preserves escaped attributes across repeated builder round trips', () => {
+  const html = '<a href="https://example.com/?a=1&amp;b=2">Link</a>'
+  let result = html
+
+  for (let i = 0; i < 3; i++) {
+    result = htmlUtils.serialize(htmlUtils.parse(result))
+    expect(result).toBe(html)
+  }
+})
+
 test('serialize html with block tags', () => {
   expect(
     htmlUtils.serialize(schema, {
@@ -84,6 +94,22 @@ test('serialize drops unsafe href protocols', () => {
   ).toBe('<a>click me</a>')
 })
 
+test('serialize drops unsafe href protocols split by control characters', () => {
+  for (const href of ['java\tscript:alert(1)', 'java\nscript:alert(1)', 'vb\rscript:alert(1)']) {
+    expect(
+      htmlUtils.serialize([
+        [
+          'a',
+          ['click me'],
+          {
+            href
+          }
+        ]
+      ])
+    ).toBe('<a>click me</a>')
+  }
+})
+
 test('plain html', () => {
   expect(
     htmlUtils.plain(
@@ -99,6 +125,54 @@ test('plain html with limit', () => {
       20
     )
   ).toBe("Programmer's guide a...")
+})
+
+test('serialize opens links in a new tab when enabled', () => {
+  expect(
+    htmlUtils.serialize(
+      [
+        [
+          'a',
+          ['click me'],
+          {
+            href: 'https://example.com'
+          }
+        ]
+      ],
+      { openLinksInNewTab: true }
+    )
+  ).toBe('<a href="https://example.com" target="_blank" rel="noopener noreferrer">click me</a>')
+})
+
+test('serialize keeps links same tab by default', () => {
+  expect(
+    htmlUtils.serialize([
+      [
+        'a',
+        ['click me'],
+        {
+          href: 'https://example.com'
+        }
+      ]
+    ])
+  ).toBe('<a href="https://example.com">click me</a>')
+})
+
+test('serialize does not add target to unsafe hrefs even when opening in a new tab', () => {
+  expect(
+    htmlUtils.serialize(
+      [
+        [
+          'a',
+          ['click me'],
+          {
+            href: 'javascript:alert(1)'
+          }
+        ]
+      ],
+      { openLinksInNewTab: true }
+    )
+  ).toBe('<a>click me</a>')
 })
 
 test('plain html with large limit', () => {

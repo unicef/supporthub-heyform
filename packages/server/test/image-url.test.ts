@@ -1,4 +1,9 @@
 import * as assert from 'assert'
+import { plainToInstance } from 'class-transformer'
+import { validateSync } from 'class-validator'
+
+import { ImageResizingDto } from '../src/common/dto'
+import { sanitizeRemoteImage } from '../src/config/upload/image'
 
 type DtoModule = typeof import('../src/common/dto')
 
@@ -51,8 +56,47 @@ async function testFirstPartyPrivateImageUrlPolicy() {
   })
 }
 
+function testBoundsResizeDimensions() {
+  const valid = plainToInstance(ImageResizingDto, {
+    url: 'https://images.unsplash.com/photo.jpg',
+    w: '640',
+    h: '480'
+  })
+  const negative = plainToInstance(ImageResizingDto, {
+    url: 'https://images.unsplash.com/photo.jpg',
+    w: '-1'
+  })
+  const excessive = plainToInstance(ImageResizingDto, {
+    url: 'https://images.unsplash.com/photo.jpg',
+    h: '4097'
+  })
+  const malformed = plainToInstance(ImageResizingDto, {
+    url: 'https://images.unsplash.com/photo.jpg',
+    w: '10junk'
+  })
+
+  assert.strictEqual(validateSync(valid).length, 0)
+  assert.ok(validateSync(negative).length > 0)
+  assert.ok(validateSync(excessive).length > 0)
+  assert.ok(validateSync(malformed).length > 0)
+}
+
+async function testRemoteImagesRejectActiveOrMalformedContent() {
+  await assert.rejects(
+    sanitizeRemoteImage(
+      Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script></svg>'
+      )
+    ),
+    /Unsupported or malformed image/
+  )
+  await assert.rejects(sanitizeRemoteImage(Buffer.from('not an image')))
+}
+
 async function run() {
   await testFirstPartyPrivateImageUrlPolicy()
+  testBoundsResizeDimensions()
+  await testRemoteImagesRejectActiveOrMalformedContent()
 }
 
 if (require.main === module) {

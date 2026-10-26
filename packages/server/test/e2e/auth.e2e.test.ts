@@ -75,6 +75,26 @@ export function build(baseUrl: string) {
     assert.ok(result.errors.length > 0, 'weak password should error')
   })
 
+  test('rejects partial invitation details at sign-up', async () => {
+    const inputs = [{ teamId: 'team_without_code' }, { inviteCode: 'code_without_team' }]
+
+    for (const invitation of inputs) {
+      const client = new E2EClient({ baseUrl })
+      const result = await client.gql('signUp', SIGN_UP_GQL, {
+        input: {
+          name: uniqueName(),
+          email: uniqueEmail(),
+          password: strongPassword(),
+          ...invitation
+        }
+      })
+
+      assert.ok(result.errors.length > 0, 'partial invitation should error')
+      assert.match(result.errors[0].message, /invitation.*invalid|invalid.*invitation/i)
+      assert.strictEqual(client.isAuthenticated(), false)
+    }
+  })
+
   test('logs in an existing user via the login query', async () => {
     const setup = new E2EClient({ baseUrl })
     const email = uniqueEmail()

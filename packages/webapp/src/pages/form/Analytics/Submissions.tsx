@@ -1,10 +1,10 @@
 import { Column, FieldKindEnum } from '@heyform-inc/shared-types-enums'
-import { useBoolean } from 'ahooks'
-import { FC, useCallback, useMemo, useState } from 'react'
+import { useBoolean, useMemoizedFn } from 'ahooks'
+import { FC, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SubmissionService } from '@/services'
-import { timeFromNow, useParam } from '@/utils'
+import { getFileUploadValue, timeFromNow, useParam } from '@/utils'
 import { helper } from '@heyform-inc/utils'
 
 import { Pagination, useToast } from '@/components'
@@ -82,11 +82,23 @@ const AnswerValue: FC<{ answer: AnyMap }> = ({ answer }) => {
     case FieldKindEnum.DATE_RANGE:
       return answer.value && [answer.value.start, answer.value.end].filter(Boolean).join(' - ')
 
-    case FieldKindEnum.FILE_UPLOAD:
-      return <div>{answer.value?.filename}</div>
+    case FieldKindEnum.FILE_UPLOAD: {
+      const value = getFileUploadValue(answer.value)
+
+      return value ? (
+        <a href={value.url} target="_blank" rel="noreferrer">
+          {value.filename}
+        </a>
+      ) : null
+    }
 
     case FieldKindEnum.SIGNATURE:
       return <div>{t('form.builder.question.signature')}</div>
+
+    // Choice answers are only listed for their typed "Other" entry.
+    case FieldKindEnum.MULTIPLE_CHOICE:
+    case FieldKindEnum.PICTURE_CHOICE:
+      return answer.value?.other
 
     default:
       return answer.value
@@ -106,6 +118,74 @@ const SubmissionItem: FC<SubmissionItemProps> = ({ answers = [] }) => {
           <div className="heyform-report-datetime">{timeFromNow(row.endAt, i18n.language)}</div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// The typed entries behind a choice question's "Other" row. Blank entries are counted, not listed.
+export function FormReportOtherAnswers({ fieldId }: { fieldId: string }) {
+  const { t } = useTranslation()
+
+  const toast = useToast()
+  const { formId } = useParam()
+
+  const [page, setPage] = useState(1)
+  const [loading, { setTrue, setFalse }] = useBoolean(true)
+  const [answers, setAnswers] = useState<AnyMap[]>([])
+  const [total, setTotal] = useState(0)
+
+  // A stable function, so a failed fetch's toast doesn't re-run the effect and fetch again.
+  const fetch = useMemoizedFn(async (newPage: number) => {
+    setTrue()
+
+    try {
+      const result = await SubmissionService.answers({
+        formId,
+        fieldId,
+        page: newPage,
+        otherOnly: true
+      })
+
+      setAnswers(result.answers)
+      setTotal(result.total)
+      setPage(newPage)
+    } catch (err: any) {
+      toast({
+        title: String(t('components.error.title')),
+        message: err.message
+      })
+    }
+
+    setFalse()
+  })
+
+  useEffect(() => {
+    fetch(1)
+  }, [fetch, fieldId, formId])
+
+  if (!loading && total < 1) {
+    return (
+      <p className="heyform-report-meta py-2">{String(t('form.analytics.report.noOtherText'))}</p>
+    )
+  }
+
+  return (
+    <div>
+      <SubmissionItem answers={answers} />
+
+      {total > 10 && (
+        <Pagination
+          className="heyform-report-pagination"
+          total={total}
+          page={page}
+          pageSize={10}
+          buttonProps={{
+            size: 'sm'
+          }}
+          loading={loading}
+          onChange={fetch}
+        />
+      )}
     </div>
   )
 }

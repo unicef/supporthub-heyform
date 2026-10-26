@@ -2,6 +2,14 @@ import { AppleSocialLogin, AppleSocialLoginOptions, UserInfo } from './apple'
 import { GoogleSocialLogin, GoogleSocialLoginOptions } from './google'
 
 export { UserInfo } from './apple'
+export {
+  OidcAuthorizationRequest,
+  OidcSocialLogin,
+  OidcSocialLoginOptions,
+  oidcIdentityKey
+} from './oidc'
+
+export const OIDC_LOGIN_KIND = 'oidc' as const
 
 export enum SocialLoginKindEnum {
   APPLE = 'apple',

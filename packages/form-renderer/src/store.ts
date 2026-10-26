@@ -8,10 +8,10 @@ import type {
 } from '@heyform-inc/shared-types-enums'
 import { QUESTION_FIELD_KINDS } from '@heyform-inc/shared-types-enums'
 import { useContext } from 'react'
-import store2 from 'store2'
 
 import {
   LRU,
+  LRUMemoryStore,
   createStoreContext,
   createStoreReducer,
   isFile,
@@ -26,15 +26,51 @@ import type { AnyMap, IFormField } from './typings'
 
 let LRU_CACHE: LRU
 
+function removeLegacyLocalStorage(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  // Versions before this hardening pass stored answer data in localStorage for seven days.
+  // Purge that bucket whenever a renderer initializes, even though autosave now defaults off.
+  try {
+    window.localStorage.removeItem('HEYFORM_DATA')
+  } catch {}
+}
+
+function getSessionStore() {
+  if (typeof window === 'undefined') {
+    return new LRUMemoryStore()
+  }
+
+  return {
+    getItem(key: string) {
+      try {
+        const value = window.sessionStorage.getItem(key)
+        return value ? JSON.parse(value) : undefined
+      } catch {
+        return undefined
+      }
+    },
+    setItem(key: string, value: unknown) {
+      try {
+        window.sessionStorage.setItem(key, JSON.stringify(value))
+      } catch {}
+    },
+    removeItem(key: string) {
+      try {
+        window.sessionStorage.removeItem(key)
+      } catch {}
+    }
+  }
+}
+
 export function getLRU(): LRU {
   if (!LRU_CACHE) {
     LRU_CACHE = new LRU({
-      bucket: 'HEYFORM_DATA',
-      store: {
-        getItem: store2.get.bind(store2),
-        setItem: store2.set.bind(store2),
-        removeItem: store2.remove.bind(store2)
-      }
+      bucket: 'HEYFORM_SESSION_DATA',
+      expires: 60 * 60,
+      store: getSessionStore()
     })
   }
   return LRU_CACHE
@@ -43,12 +79,14 @@ export function getLRU(): LRU {
 export function getStorage(formId: string, autoSave?: boolean) {
   const values: any = {}
 
+  removeLegacyLocalStorage()
+
   if (autoSave) {
     const cache = getLRU().get(formId)
 
     if (helper.isValid(cache)) {
-      Object.keys(values).forEach(key => {
-        const value = values[key]
+      Object.keys(cache).forEach(key => {
+        const value = cache[key]
 
         if (helper.isValid(value)) {
           values[key] = value

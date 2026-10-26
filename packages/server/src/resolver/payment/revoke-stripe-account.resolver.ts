@@ -1,5 +1,8 @@
-import { Auth, FormGuard } from '@decorator'
+import { BadRequestException } from '@nestjs/common'
+
+import { Auth, FormGuard, Team } from '@decorator'
 import { FormDetailInput } from '@graphql'
+import { TeamModel } from '@model'
 import { Args, Mutation, Resolver } from '@nestjs/graphql'
 import { FormService } from '@service'
 
@@ -10,9 +13,20 @@ export class RevokeStripeAccountResolver {
 
   @Mutation(returns => Boolean)
   @FormGuard()
-  async revokeStripeAccount(@Args('input') input: FormDetailInput): Promise<boolean> {
+  async revokeStripeAccount(
+    @Team() team: TeamModel,
+    @Args('input') input: FormDetailInput
+  ): Promise<boolean> {
+    if (!team.isOwner) {
+      throw new BadRequestException(
+        "You don't have permission to connect a Stripe account for this workspace"
+      )
+    }
+
     return this.formService.update(input.formId, {
-      stripeAccount: undefined
+      $unset: {
+        stripeAccount: 1
+      }
     })
   }
 }

@@ -12,6 +12,7 @@ import {
   replaceTriggerText
 } from './utils'
 import { cn } from '@/utils'
+import { htmlUtils } from '@heyform-inc/answer-utils'
 import { helper } from '@heyform-inc/utils'
 
 import { FormFieldType } from '@/types'
@@ -21,7 +22,6 @@ import { MentionMenu } from './MentionMenu'
 
 interface RichTextProps extends Omit<ComponentProps, 'onChange'> {
   innerRef: RefObject<HTMLDivElement>
-  value?: string
   placeholder?: string
   onChange?: (value: string) => void
 }
@@ -32,7 +32,6 @@ const RICH_TEXT_TOOLBAR_SELECTOR = '[data-rich-text-toolbar="true"]'
 export const RichText: FC<RichTextProps> = ({
   className,
   innerRef,
-  value,
   placeholder,
   onChange,
   ...restProps
@@ -93,23 +92,40 @@ export const RichText: FC<RichTextProps> = ({
       startOffset: ts.startOffset! - 1,
       endOffset: ts.startOffset! + (keyword?.length || 0)
     }
-    let template = ''
+    let mention: Parameters<typeof replaceTriggerText>[2]
 
     if (type === 'variable') {
-      template = `<span class="variable" data-variable="${option.id}" contenteditable="false">@${
-        (option as Variable).name
-      }</span>\xA0`
+      mention = {
+        className: 'variable',
+        dataAttribute: 'data-variable',
+        id: option.id!,
+        label: (option as Variable).name
+      }
     } else if (type === 'mention') {
-      template = `<span class="mention" data-mention="${option.id}" contenteditable="false">@${
-        (option as FormFieldType).title
-      }</span>\xA0`
+      const title = (option as FormFieldType).title
+
+      mention = {
+        className: 'mention',
+        dataAttribute: 'data-mention',
+        id: option.id!,
+        label: htmlUtils.plain(
+          Array.isArray(title) ? htmlUtils.serialize(title) : String(title || '')
+        )
+      }
     } else if (type === 'hiddenfield') {
-      template = `<span class="hiddenfield" data-hiddenfield="${
-        (option as HiddenField).name
-      }" contenteditable="false">@${(option as HiddenField).name}</span>\xA0`
+      const name = (option as HiddenField).name
+
+      mention = {
+        className: 'hiddenfield',
+        dataAttribute: 'data-hiddenfield',
+        id: name,
+        label: name
+      }
+    } else {
+      return
     }
 
-    replaceTriggerText(innerRef.current!, sel, template)
+    replaceTriggerText(innerRef.current!, sel, mention)
 
     handleUpdateCallback()
     hideMentionMenu()
@@ -218,12 +234,6 @@ export const RichText: FC<RichTextProps> = ({
   const hideMentionMenuCallback = useCallback(hideMentionMenu, [])
   const handleMentionSelectCallback = useCallback(handleMentionSelect, [keyword, triggerSelection])
   const hideToolbarCallback = useCallback(hideToolbar, [])
-
-  useEffect(() => {
-    if (innerRef.current && helper.isValid(value)) {
-      innerRef.current.innerHTML = value!
-    }
-  }, [innerRef])
 
   useEffect(() => {
     function handleSelectionChange() {

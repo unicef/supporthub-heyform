@@ -34,8 +34,10 @@ export class SendResetPasswordEmailResolver {
 
     const user = await this.userService.findByEmail(input.email)
 
+    // Always return the same public result so this endpoint cannot be used to
+    // enumerate registered email addresses.
     if (helper.isEmpty(user)) {
-      throw new BadRequestException('The email address does not exist')
+      return true
     }
 
     const key = `reset_password:${user.id}`

@@ -1,5 +1,7 @@
 import { HiddenFieldAnswer } from '@heyform-inc/shared-types-enums'
 
+import { escapeHtmlText } from './escape-html'
+
 export function hiddenFieldsToHtml(hiddenFields: HiddenFieldAnswer[]): string {
   if (!hiddenFields.length) return ''
 
@@ -7,8 +9,8 @@ export function hiddenFieldsToHtml(hiddenFields: HiddenFieldAnswer[]): string {
     .map(hiddenField => {
       return `
 <li>
-  <h3>${hiddenField.name}</h3>
-  <p>${hiddenField.value}</p>
+  <h3>${escapeHtmlText(hiddenField.name)}</h3>
+  <p>${escapeHtmlText(hiddenField.value)}</p>
 </li>
 `
     })

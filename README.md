@@ -60,11 +60,9 @@ Choosing our hosted version not only saves a significant amount of time and reso
 
 Interested in self-hosting HeyForm on your server? Take a look at the [self-hosting installation instructions](https://docs.heyform.net/open-source/self-hosting).
 
-### One Click Deployment
+To connect a self-hosted identity provider such as Authelia, Authentik, or Keycloak, see the [generic OpenID Connect setup guide](https://docs.heyform.net/open-source/configuration/oidc).
 
-<a href="https://railway.app/template/f5vBKm">
-	<img src="https://railway.app/button.svg" alt="Deploy on Railway" height="36" />
-</a>
+### One Click Deployment
 
 <a href="https://zeabur.com/templates/9YAUUO" style="margin-left:8px">
 	<img src="https://zeabur.com/button.svg" alt="Deploy on Zeabur" />
@@ -80,6 +78,10 @@ Interested in self-hosting HeyForm on your server? Take a look at the [self-host
 
 <a href="https://computenest.console.aliyun.com/service/instance/create/cn-hangzhou?type=user&ServiceId=service-a47e56f0ea9f460d8d33" style="margin-left:24px">
 	<img src="https://service-info-public.oss-cn-hangzhou.aliyuncs.com/computenest-en.svg" alt="Deploy on Alibaba Cloud" height="36" />
+</a>
+
+<a href="https://zop.dev/zopday/app/deploy?image=heyform/community-edition&port=9157" style="margin-left:24px">
+	<img src="https://zop.dev/deploytozopday-inkhard.svg" alt="Deploy on ZopDay" height="36" />
 </a>
 
 ## Local development

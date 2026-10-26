@@ -26,8 +26,13 @@ export class ProjectDetailInput {
 
 @InputType()
 export class DeleteProjectInput extends ProjectDetailInput {
-  @Field()
-  code: string
+  @Field({ nullable: true })
+  @IsOptional()
+  code?: string
+
+  @Field({ nullable: true })
+  @IsOptional()
+  name?: string
 }
 
 @InputType()

@@ -10,3 +10,7 @@ export * from './changelog.controller'
 export { LogoutController } from './logout.controller'
 export { DashboardController } from './dashboard.controller'
 export { SupporthubController } from './supporthub.controller'
+export {
+  IntegrationOAuthCallbackController,
+  IntegrationOAuthController
+} from './integration-oauth.controller'

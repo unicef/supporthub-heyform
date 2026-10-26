@@ -34,14 +34,20 @@ declare global {
       cookieDomain?: string
       stripePublishableKey?: string
       googleRecaptchaKey?: string
+      uploadOrigins?: string[]
       verifyEmailResendCooldownSeconds?: number | string
       appDisableRegistration?: boolean | string
       ssoOnly?: boolean | string
       tenantReturnUrl?: string
       enableGoogleFonts?: boolean | string
+      disableLoginWithPassword?: boolean | string
       disableLoginWithApple?: boolean | string
       disableLoginWithGoogle?: boolean | string
+      disableLoginWithOidc?: boolean | string
+      oidcDisplayName?: string
+      oidcDisplayIconUrl?: string
       verifyUserEmail?: boolean | string
+      disableSubmissionIp?: boolean | string
       templatesURL?: string
       helpCenterURL?: string
     }

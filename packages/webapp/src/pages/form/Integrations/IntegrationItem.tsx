@@ -3,8 +3,8 @@ import { useRequest } from 'ahooks'
 import { FC, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { getIntegrationDescription } from './utils'
-import { IntegrationService } from '@/services'
+import { getIntegrationAuth, getIntegrationDescription } from './utils'
+import { FormService, IntegrationService } from '@/services'
 import { useParam } from '@/utils'
 import { helper } from '@heyform-inc/utils'
 
@@ -12,6 +12,8 @@ import { Button, Image, Switch, Tooltip } from '@/components'
 import { APP_STATUS_ENUM, INTEGRATION_STATUS_ENUM } from '@/consts'
 import { useAppStore, useFormStore } from '@/store'
 import { IntegratedAppType } from '@/types'
+
+import { IntegrationWaitingCount } from './IntegrationRecords'
 
 interface IntegrationItemProps {
   app: IntegratedAppType
@@ -22,7 +24,7 @@ const IntegrationItem: FC<IntegrationItemProps> = ({ app }) => {
 
   const { formId } = useParam()
   const { openModal } = useAppStore()
-  const { updateIntegration, deleteIntegration } = useFormStore()
+  const { updateIntegration, deleteIntegration, setIntegrations } = useFormStore()
   const [hasIconError, setHasIconError] = useState(false)
 
   const active = useMemo(
@@ -38,6 +40,11 @@ const IntegrationItem: FC<IntegrationItemProps> = ({ app }) => {
 
       await IntegrationService.updateStatus(formId, app.id, status)
       updateIntegration(app.id, { status })
+
+      // Turning it on sends what was waiting; the server says what's left
+      if (checked && app.integration?.waitingCount) {
+        setIntegrations(await FormService.integrations(formId))
+      }
     },
     {
       manual: true,
@@ -69,7 +76,25 @@ const IntegrationItem: FC<IntegrationItemProps> = ({ app }) => {
     })
   }
 
+  const needsReconnect = app.integration?.status === INTEGRATION_STATUS_ENUM.NEEDS_RECONNECT
+
   const children = useMemo(() => {
+    if (needsReconnect) {
+      return (
+        <div className="flex items-center gap-x-1">
+          <Button size="sm" onClick={handleConnect}>
+            {t('form.integrations.auth.reconnect')}
+          </Button>
+
+          <Tooltip label={t('components.delete')}>
+            <Button.Link size="sm" loading={deleteLoading} iconOnly onClick={deleteRun}>
+              <IconTrash className="h-5 w-5" />
+            </Button.Link>
+          </Tooltip>
+        </div>
+      )
+    }
+
     switch (app.status) {
       case APP_STATUS_ENUM.ACTIVE:
         return (
@@ -97,10 +122,10 @@ const IntegrationItem: FC<IntegrationItemProps> = ({ app }) => {
           </Button>
         )
     }
-  }, [handleConnect, t, deleteLoading])
+  }, [handleConnect, t, deleteLoading, needsReconnect])
 
   return (
-    <li className="hf-card border-input cursor-default rounded-lg border px-6 py-6 text-sm">
+    <li className="border-input cursor-default rounded-lg border px-4 py-6 text-sm">
       <div className="flex items-center justify-between">
         {!hasIconError && helper.isValid(app.icon) ? (
           <Image
@@ -117,6 +142,14 @@ const IntegrationItem: FC<IntegrationItemProps> = ({ app }) => {
       </div>
       <div className="mt-2 font-medium">{app.name}</div>
       <div className="text-secondary mt-1">{getIntegrationDescription(t, app)}</div>
+      {needsReconnect && (
+        <div className="text-error mt-2">
+          {t('form.integrations.auth.needsReconnect', {
+            name: getIntegrationAuth(t, app).providerName
+          })}
+        </div>
+      )}
+      <IntegrationWaitingCount count={app.integration?.waitingCount} />
     </li>
   )
 }

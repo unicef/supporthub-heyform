@@ -1,6 +1,8 @@
 import { createElement } from 'react'
 import { Navigate } from 'react-router-dom'
 
+import { hasInvitationCookie } from '@/utils'
+
 import { isRegistrationDisabled, isSsoOnly } from '@/consts'
 import { AuthLayout, BaseLayout, WorkspaceGuard, WorkspaceLayout } from '@/layouts'
 import ForgotPassword from '@/pages/auth/ForgotPassword'
@@ -17,6 +19,7 @@ import FormSettings from '@/pages/form/Settings'
 import FormShare from '@/pages/form/Share'
 import FormSubmissions from '@/pages/form/Submissions'
 import ProjectForms from '@/pages/project/Forms'
+import ProjectMembers from '@/pages/project/Members'
 import ProjectTrash from '@/pages/project/Trash'
 import CreateWorkspace from '@/pages/workspace/Create'
 import WorkspaceDashboard from '@/pages/workspace/Dashboard'
@@ -25,7 +28,7 @@ import WorkspaceMembers from '@/pages/workspace/Members'
 import WorkspaceSettings from '@/pages/workspace/Settings'
 
 const SignUpRoute = () =>
-  isRegistrationDisabled()
+  isRegistrationDisabled() && !hasInvitationCookie()
     ? createElement(Navigate, { to: '/login', replace: true })
     : createElement(SignUp)
 
@@ -154,6 +157,16 @@ const routes = [
       projectShell: true,
       loginRequired: true,
       title: 'project.trash.title'
+    }
+  },
+  {
+    path: '/workspace/:workspaceId/project/:projectId/members',
+    layout: WorkspaceLayout,
+    component: ProjectMembers,
+    options: {
+      projectShell: true,
+      loginRequired: true,
+      title: 'project.members.title'
     }
   },
   {

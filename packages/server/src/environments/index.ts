@@ -22,6 +22,7 @@ export const APP_LISTEN_PORT: number = +process.env.APP_LISTEN_PORT || 9157
 export const APP_LISTEN_HOSTNAME: string = process.env.APP_LISTEN_HOSTNAME || '0.0.0.0'
 export const APP_HOMEPAGE_URL: string =
   process.env.APP_HOMEPAGE_URL || `http://${APP_LISTEN_HOSTNAME}:${APP_LISTEN_PORT}`
+export const TRUST_PROXY: boolean | number | string = parseTrustProxy(process.env.TRUST_PROXY)
 export const CORS_ALLOWED_ORIGINS: string[] = (process.env.CORS_ALLOWED_ORIGINS || APP_HOMEPAGE_URL)
   .split(',')
   .map(origin => origin.trim())
@@ -58,6 +59,14 @@ export const UPLOAD_DIR: string = resolve(STATIC_DIR, 'upload')
 // Encryption
 export const FORM_ENCRYPTION_KEY: string = process.env.FORM_ENCRYPTION_KEY
 
+// Encrypts integration credentials (API keys, OAuth2 tokens). Separate from
+// FORM_ENCRYPTION_KEY so rotating either never breaks the other. The previous
+// key is only used to read values written before a rotation.
+export const INTEGRATION_ENCRYPTION_KEY: string | undefined =
+  process.env.INTEGRATION_ENCRYPTION_KEY?.trim() || undefined
+export const INTEGRATION_ENCRYPTION_KEY_PREVIOUS: string | undefined =
+  process.env.INTEGRATION_ENCRYPTION_KEY_PREVIOUS?.trim() || undefined
+
 // Bcrypt
 export const BCRYPT_SALT: number = +process.env.BCRYPT_SALT || 10
 
@@ -72,11 +81,16 @@ export const MONGO_SSL_CA_PATH: Buffer[] | undefined = process.env.MONGO_SSL_CA_
 // Redis
 export const REDIS_HOST: string = process.env.REDIS_HOST || '127.0.0.1'
 export const REDIS_PORT: number = +process.env.REDIS_PORT || 6379
+export const REDIS_USERNAME: string = process.env.REDIS_USERNAME
 export const REDIS_PASSWORD: string = process.env.REDIS_PASSWORD
 export const REDIS_DB: number = +process.env.REDIS_DB || 0
+export const REDIS_TLS: string = process.env.REDIS_TLS
 
 // SMTP
-export const VERIFY_USER_EMAIL: boolean = toBool(process.env.VERIFY_USER_EMAIL, false)
+// Whether a password sign-up has to confirm a code sent by email before using the
+// workspace. Defaults to true; set to false for installs without SMTP, where nobody
+// could receive the code.
+export const VERIFY_USER_EMAIL: boolean = toBool(process.env.VERIFY_USER_EMAIL, true)
 export const SMTP_FROM: string = process.env.SMTP_FROM
 export const SMTP_HOST: string = process.env.SMTP_HOST
 export const SMTP_PORT: number = +process.env.SMTP_PORT
@@ -92,6 +106,9 @@ export const GOOGLE_RECAPTCHA_SECRET: string = process.env.GOOGLE_RECAPTCHA_SECR
 
 // Akismet
 export const AKISMET_KEY: string = process.env.AKISMET_KEY
+
+// Don't save respondents' IP addresses with their submissions
+export const DISABLE_SUBMISSION_IP: boolean = helper.isTrue(process.env.DISABLE_SUBMISSION_IP)
 
 // Social login
 export const APPLE_LOGIN_TEAM_ID: string = process.env.APPLE_LOGIN_TEAM_ID
@@ -111,6 +128,23 @@ export const GOOGLE_LOGIN_CLIENT_ID: string = process.env.GOOGLE_LOGIN_CLIENT_ID
 export const GOOGLE_LOGIN_CLIENT_SECRET: string = process.env.GOOGLE_LOGIN_CLIENT_SECRET
 export const DISABLE_LOGIN_WITH_GOOGLE =
   helper.isEmpty(GOOGLE_LOGIN_CLIENT_ID) || helper.isEmpty(GOOGLE_LOGIN_CLIENT_SECRET)
+
+export const OIDC_CLIENT_ID: string = process.env.OIDC_CLIENT_ID
+export const OIDC_CLIENT_SECRET: string = process.env.OIDC_CLIENT_SECRET
+export const OIDC_ISSUER: string = process.env.OIDC_ISSUER
+export const OIDC_DISPLAY_NAME: string = process.env.OIDC_DISPLAY_NAME || 'SSO'
+export const OIDC_DISPLAY_ICON_URL: string = process.env.OIDC_DISPLAY_ICON_URL || ''
+export const OIDC_CLIENT_AUTH_METHOD = (process.env.OIDC_CLIENT_AUTH_METHOD ||
+  'client_secret_basic') as 'client_secret_basic' | 'client_secret_post'
+export const OIDC_ALLOW_PROVISIONING: boolean = helper.isTrue(process.env.OIDC_ALLOW_PROVISIONING)
+export const DISABLE_LOGIN_WITH_OIDC =
+  helper.isEmpty(OIDC_CLIENT_ID) ||
+  helper.isEmpty(OIDC_CLIENT_SECRET) ||
+  helper.isEmpty(OIDC_ISSUER) ||
+  !['client_secret_basic', 'client_secret_post'].includes(OIDC_CLIENT_AUTH_METHOD)
+
+export const DISABLE_LOGIN_WITH_PASSWORD: boolean =
+  process.env.DISABLE_LOGIN_WITH_PASSWORD?.toLowerCase() === 'true'
 
 // Stripe
 export const STRIPE_VERSION: string = process.env.STRIPE_VERSION
@@ -204,3 +238,21 @@ export const S3_BUCKET = process.env.S3_BUCKET
 export const S3_ACCESS_KEY_ID = process.env.S3_ACCESS_KEY_ID
 export const S3_SECRET_ACCESS_KEY = process.env.S3_SECRET_ACCESS_KEY
 export const S3_PUBLIC_URL = process.env.S3_PUBLIC_URL
+
+export function parseTrustProxy(value?: string): boolean | number | string {
+  const normalized = value?.trim()
+
+  if (!normalized || normalized.toLowerCase() === 'false') {
+    return false
+  }
+
+  if (normalized.toLowerCase() === 'true') {
+    return true
+  }
+
+  if (/^\d+$/.test(normalized)) {
+    return Number(normalized)
+  }
+
+  return normalized
+}

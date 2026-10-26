@@ -106,7 +106,7 @@ export const FormRenderer: FC<FormRendererProps> = ({
   form,
   locale,
   query = {},
-  autoSave = true,
+  autoSave = false,
   stripeApiKey,
   stripeAccountId,
   reportAbuseURL,

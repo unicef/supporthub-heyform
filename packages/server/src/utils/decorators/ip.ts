@@ -1,20 +1,11 @@
 import { ExecutionContext, createParamDecorator } from '@nestjs/common'
 import 'reflect-metadata'
 
-import { helper } from '@heyform-inc/utils'
 import { GqlExecutionContext } from '@nestjs/graphql'
 
-export function ip(req: any, headerName = 'x-forwarded-for'): string {
-  const val = req.get(headerName)
-
-  if (helper.isValid(val)) {
-    const ips = val.split(/\s*,\s*/)
-
-    if (helper.isValidArray(ips)) {
-      return ips[0]
-    }
-  }
-
+export function ip(req: any): string {
+  // Express resolves req.ip according to the configured trust proxy policy.
+  // Reading X-Forwarded-For directly would allow clients to spoof this value.
   return req.ip
 }
 

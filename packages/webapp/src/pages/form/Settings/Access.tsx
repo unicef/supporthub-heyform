@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { DatePicker, Form, Input, Select, Switch } from '@/components'
-import { TIMEZONES } from '@/consts'
+import { TIMEZONES, isSubmissionIpDisabled } from '@/consts'
 import { useFormStore } from '@/store'
 
 export default function FormSettingsAccess() {
@@ -62,7 +62,7 @@ export default function FormSettingsAccess() {
 
   return (
     <section id="access" className="pt-10">
-      <h2 className="hf-section-title">{t('form.settings.access.title')}</h2>
+      <h2 className="text-lg font-semibold">{t('form.settings.access.title')}</h2>
 
       <div className="mt-4 space-y-8">
         <Form.Item
@@ -172,6 +172,18 @@ export default function FormSettingsAccess() {
             </div>
           )}
         </div>
+
+        {!isSubmissionIpDisabled() && (
+          <Form.Item
+            className="[&_[data-slot=content]]:pt-1.5"
+            name="displayIpAddress"
+            label={t('form.settings.access.displayIpAddress.headline')}
+            description={t('form.settings.access.displayIpAddress.subHeadline')}
+            isInline
+          >
+            <Switch />
+          </Form.Item>
+        )}
 
         <div>
           <Form.Item

@@ -35,6 +35,10 @@
     "pt-br": {
       "original": "Português (Brasil)",
       "translated": "portugalski (Brazylia)"
+    },
+    "es": {
+      "original": "Español",
+      "translated": "Hiszpański"
     }
   },
   "timezones": {
@@ -743,6 +747,11 @@
         "label": "Wprowadź kod usunięcia wysłany na <strong>{{email}}</strong>.",
         "required": "Kod weryfikacyjny nie może być pusty"
       },
+      "name": {
+        "label": "Aby potwierdzić, wpisz nazwę projektu <strong>{{name}}</strong>.",
+        "required": "Nazwa projektu nie może być pusta",
+        "invalid": "Aby potwierdzić, wpisz dokładnie {{name}}."
+      },
       "confirm": "Usuń projekt"
     },
     "moveto": {
@@ -1170,6 +1179,10 @@
           "times": "razy",
           "inEvery": "w każdym"
         },
+        "displayIpAddress": {
+          "headline": "Pokazuj adresy IP respondentów",
+          "subHeadline": "Pokazuje adres IP każdego respondenta w tabeli zgłoszeń, eksportach CSV i webhookach."
+        },
         "quotaLimit": {
           "headline": "Ogranicz liczbę zgłoszeń",
           "subHeadline": "Pozwala to ustawić określoną całkowitą liczbę dozwolonych zgłoszeń dla Twojego formularza.",
@@ -1203,6 +1216,13 @@
         "respondent": {
           "headline": "Powiadomienia e-mail dla respondentów",
           "subHeadline": "Wyślij spersonalizowaną wiadomość tekstową do respondentów po przesłaniu formularza."
+        },
+        "recipients": {
+          "headline": "Dodatkowi odbiorcy",
+          "subHeadline": "Wysyłaj odpowiedzi także na te adresy, nawet jeśli nie mają konta HeyForm. Jeden adres w wierszu, maksymalnie {{max}}.",
+          "placeholder": "name@example.com",
+          "invalid": "{{email}} nie jest prawidłowym adresem e-mail",
+          "tooMany": "Dodaj maksymalnie {{max}} odbiorców"
         }
       },
       "protection": {
@@ -1249,6 +1269,7 @@
         "website": "Strona internetowa",
         "inputTable": "Tabela wejściowa",
         "submitDate": "Data zgłoszenia",
+        "ipAddress": "Adres IP",
         "hiddenFields": "Ukryte pola",
         "contactInfo": "Informacje kontaktowe",
         "choices": "Wybory",

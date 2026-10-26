@@ -1,14 +1,20 @@
 import { helper } from '@heyform-inc/utils'
 
-export function requestParser(req: any, keys: string[]): any {
-  const sources = ['body', 'query', 'params']
-  let value: any
+interface RequestLike {
+  body?: Record<string, unknown>
+  query?: Record<string, unknown>
+  params?: Record<string, unknown>
+}
+
+export function requestParser(req: RequestLike | undefined, keys: string[]): string | undefined {
+  const sources: Array<keyof RequestLike> = ['body', 'query', 'params']
+  let value: string | undefined
 
   for (const source of sources) {
     for (const key of keys) {
-      const searchValue = req[source][key]
+      const searchValue = req?.[source]?.[key]
 
-      if (helper.isValid(searchValue)) {
+      if (typeof searchValue === 'string' && helper.isValid(searchValue)) {
         value = searchValue
         break
       }

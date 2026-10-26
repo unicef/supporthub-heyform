@@ -1,16 +1,19 @@
+import { locales } from '@heyform-inc/form-renderer/src'
 import { FormModel } from '@heyform-inc/shared-types-enums'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { getPreferredLanguage } from './utils/brower-language'
+import { getFormLanguage } from './utils/brower-language'
+import { setFormMetadata } from './utils/metadata'
 import { FormService } from '@/services'
 import { useParam, useQuery } from '@/utils'
 
 import { Async } from '@/components'
 import '@/styles/render.scss'
+import { FormThemeSettings } from '@/types'
 
 import { Renderer } from './components/Renderer'
 
-const LANGUAGES = ['en', 'de', 'fr', 'pl', 'pt-br', 'ja', 'zh-cn', 'zh-tw']
+const LANGUAGES = Object.keys(locales)
 
 export default function FormRender() {
   const { formId } = useParam()
@@ -19,11 +22,17 @@ export default function FormRender() {
   const [form, setForm] = useState<FormModel | null>(null)
   const [locale, setLocale] = useState<string>()
 
+  useEffect(() => {
+    if (form) {
+      return setFormMetadata(form.name, (form.themeSettings as FormThemeSettings)?.favicon)
+    }
+  }, [form])
+
   async function fetchData() {
     const result = await FormService.publicForm(formId)
 
     setForm(result)
-    setLocale(getPreferredLanguage(LANGUAGES, result.form.settings.locale || LANGUAGES[0]))
+    setLocale(getFormLanguage(LANGUAGES, result.settings?.locale))
 
     return true
   }

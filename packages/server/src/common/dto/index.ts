@@ -4,6 +4,8 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Max,
+  Min,
   Validate,
   ValidatorConstraint,
   ValidatorConstraintInterface
@@ -53,6 +55,7 @@ export const FIRST_PARTY_IMAGE_ORIGINS = [
 ].filter(Boolean) as string[]
 
 export const ALLOWED_IMAGE_HOSTS = [
+  'heyform.github.io',
   'secure.gravatar.com',
   'googleusercontent.com',
   'images.unsplash.com',
@@ -102,13 +105,17 @@ export class ImageResizingDto {
   @Validate(IsAllowedImageUrlConstraint)
   url: string
 
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
   @IsInt()
+  @Min(1)
+  @Max(4096)
   @IsOptional()
   w?: number
 
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
   @IsInt()
+  @Min(1)
+  @Max(4096)
   @IsOptional()
   h?: number
 }

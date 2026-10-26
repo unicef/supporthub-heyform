@@ -154,9 +154,11 @@ export const WORKSPACE_RECENT_FORMS_GQL = gql`
         enableIpLimit
         ipLimitCount
         ipLimitTime
+        displayIpAddress
         enableProgress
         enableQuestionList
         enableNavigationArrows
+        openLinksInNewTab
         locale
         languages
         enableClosedMessage
@@ -292,7 +294,6 @@ export const TEMPLATES_GQL = gql`
   query templates {
     templates {
       id
-      recordId
       category
       name
       thumbnail
@@ -304,8 +305,14 @@ export const TEMPLATE_DETAILS_GQL = gql`
   query templateDetail($input: TemplateDetailInput!) {
     templateDetail(input: $input) {
       id
+      kind
+      interactiveMode
+      logics
+      variables
+      translations
       fields {
         id
+        nextFieldId
         title
         description
         kind
@@ -313,6 +320,8 @@ export const TEMPLATE_DETAILS_GQL = gql`
         properties
       }
       themeSettings {
+        logo
+        favicon
         theme
       }
     }
@@ -422,9 +431,11 @@ export const FORMS_GQL = gql`
         enableIpLimit
         ipLimitCount
         ipLimitTime
+        displayIpAddress
         enableProgress
         enableQuestionList
         enableNavigationArrows
+        openLinksInNewTab
         locale
         languages
         enableClosedMessage
@@ -511,6 +522,7 @@ export const FORM_SUMMARY_GQL = gql`
         enableIpLimit
         ipLimitCount
         ipLimitTime
+        displayIpAddress
         locale
         languages
         enableClosedMessage
@@ -558,10 +570,13 @@ export const FORM_DETAIL_GQL = gql`
         enableIpLimit
         ipLimitCount
         ipLimitTime
+        displayIpAddress
         enableProgress
         enableQuestionList
         enableNavigationArrows
+        openLinksInNewTab
         enableEmailNotification
+        notificationRecipients
         locale
         languages
         enableClosedMessage
@@ -575,6 +590,7 @@ export const FORM_DETAIL_GQL = gql`
       }
       drafts {
         id
+        nextFieldId
         title
         description
         kind
@@ -588,9 +604,11 @@ export const FORM_DETAIL_GQL = gql`
       }
       translations
       logics
+      draftLogics
       variables
       themeSettings {
         logo
+        favicon
         theme
       }
       retentionAt
@@ -656,6 +674,7 @@ export const UPDATE_FORM_SCHEMAS_GQL = gql`
       version
       drafts {
         id
+        nextFieldId
         title
         description
         kind
@@ -750,6 +769,10 @@ export const FORM_INTEGRATIONS_GQL = gql`
       appId
       config
       status
+      connected
+      connectionId
+      apiKeyHint
+      waitingCount
     }
   }
 `
@@ -810,12 +833,28 @@ export const APPS_GQL = gql`
       name
       description
       icon
+      auth {
+        type
+        provider
+        providerName
+        label
+        description
+      }
       settings {
         type
         name
         label
+        description
         placeholder
         required
+        options {
+          label
+          value
+        }
+        loadsOptions
+        dependsOn
+        visibleWhen
+        defaultValue
       }
     }
   }
@@ -837,6 +876,7 @@ export const SUBMISSIONS_GQL = gql`
         }
         variables
         endAt
+        ip
       }
     }
   }
@@ -1063,14 +1103,80 @@ export const UPDATE_INTEGRATION_SETTINGS_GQL = gql`
   }
 `
 
+export const INTEGRATION_RECORDS_GQL = gql`
+  query integrationRecords($input: IntegrationInput!) {
+    integrationRecords(input: $input) {
+      id
+      submissionId
+      status
+      attempt
+      maxAttempts
+      willRetry
+      error
+      createdAt
+    }
+  }
+`
+
 export const UPDATE_INTEGRATION_STATUS_GQL = gql`
   mutation updateIntegrationStatus($input: UpdateIntegrationStatusInput!) {
     updateIntegrationStatus(input: $input)
   }
 `
 
+export const INTEGRATION_SETTING_OPTIONS_GQL = gql`
+  query integrationSettingOptions($input: IntegrationSettingOptionsInput!) {
+    integrationSettingOptions(input: $input) {
+      label
+      value
+    }
+  }
+`
+
+export const INTEGRATION_CONNECTIONS_GQL = gql`
+  query integrationConnections($input: IntegrationInput!) {
+    integrationConnections(input: $input) {
+      id
+      provider
+      providerName
+      accountEmail
+      accountName
+      connectedBy
+      status
+      statusReason
+      hasScopes
+    }
+  }
+`
+
+export const TEAM_INTEGRATION_CONNECTIONS_GQL = gql`
+  query teamIntegrationConnections($input: TeamDetailInput!) {
+    teamIntegrationConnections(input: $input) {
+      id
+      provider
+      providerName
+      accountEmail
+      accountName
+      connectedBy
+      status
+      statusReason
+      forms {
+        id
+        name
+      }
+      canDisconnect
+    }
+  }
+`
+
+export const DISCONNECT_INTEGRATION_CONNECTION_GQL = gql`
+  mutation disconnectIntegrationConnection($input: IntegrationConnectionInput!) {
+    disconnectIntegrationConnection(input: $input)
+  }
+`
+
 export const DELETE_INTEGRATION_SETTINGS_GQL = gql`
-  mutation deleteIntegrationSettings($input: ThirdPartyInput!) {
+  mutation deleteIntegrationSettings($input: IntegrationInput!) {
     deleteIntegrationSettings(input: $input)
   }
 `
@@ -1418,6 +1524,7 @@ export const PUBLIC_FORM_GQL = gql`
         enableProgress
         enableQuestionList
         enableNavigationArrows
+        openLinksInNewTab
         locale
         languages
         enableClosedMessage
@@ -1427,6 +1534,7 @@ export const PUBLIC_FORM_GQL = gql`
       }
       drafts {
         id
+        nextFieldId
         title
         titleSchema
         description
@@ -1437,6 +1545,7 @@ export const PUBLIC_FORM_GQL = gql`
       }
       fields {
         id
+        nextFieldId
         title
         titleSchema
         description
@@ -1454,6 +1563,8 @@ export const PUBLIC_FORM_GQL = gql`
       variables
       fieldsUpdatedAt
       themeSettings {
+        logo
+        favicon
         theme
       }
       retentionAt

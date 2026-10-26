@@ -35,6 +35,10 @@
     "pt-br": {
       "original": "Português (Brasil)",
       "translated": "Brazilian Portuguese"
+    },
+    "es": {
+      "original": "Español",
+      "translated": "Spanish"
     }
   },
   "timezones": {
@@ -656,6 +660,20 @@
         "next": "Next"
       }
     },
+    "connectedAccounts": {
+      "title": "Connected accounts",
+      "description": "Accounts connected for integrations. Everyone in the workspace can use them on any form.",
+      "empty": "No accounts are connected yet. Connect one from a form’s integrations.",
+      "connectedBy": "Connected by {{name}}",
+      "active": "Connected",
+      "needsReconnect": "Needs reconnecting",
+      "forms_one": "Used by {{count}} form: {{names}}",
+      "forms_other": "Used by {{count}} forms: {{names}}",
+      "unused": "Not used by any form",
+      "disconnect": "Disconnect",
+      "disconnectHeadline": "Disconnect {{account}}?",
+      "disconnectDescription": "HeyForm will stop using this account and ask {{provider}} to revoke its access. Integrations using it will pause, and their submissions will wait until someone picks another account or connects this one again."
+    },
     "exportData": {
       "title": "Export Data",
       "description": "Get an email with all your forms, settings in one file.",
@@ -750,6 +768,11 @@
         "label": "Enter deletion code sent to <strong>{{email}}</strong>.",
         "required": "The verification code is not allow to be empty"
       },
+      "name": {
+        "label": "Enter the project name <strong>{{name}}</strong> to confirm.",
+        "required": "The project name cannot be empty",
+        "invalid": "Enter {{name}} exactly to confirm."
+      },
       "confirm": "Delete project"
     }
   },
@@ -795,6 +818,10 @@
     },
     "template": {
       "headline": "Templates",
+      "emptyHeadline": "No templates available",
+      "emptyDescription": "You can import a form from JSON or go back to create one from scratch.",
+      "loadError": "Unable to load templates. Please reopen this window to try again.",
+      "importJson": "Import from JSON",
       "categories": [
         "Survey",
         "Lead Generation",
@@ -876,7 +903,8 @@
         "submission_other": "{{count}} submissions",
         "submission2_zero": "No submissions yet · {{average}} average",
         "submission2_one": "{{count}} submission · {{average}} average",
-        "submission2_other": "{{count}} submissions · {{average}} average"
+        "submission2_other": "{{count}} submissions · {{average}} average",
+        "noOtherText": "Everyone who chose “Other” left it blank."
       }
     },
     "customReport": {
@@ -1097,12 +1125,60 @@
           "headline": "Database"
         }
       },
+      "auth": {
+        "apiKey": "API key",
+        "apiKeySaved": "A key is saved ({{hint}}). Leave this blank to keep it.",
+        "connectDescription": "Connect your {{name}} account so HeyForm can send submissions to it.",
+        "connectAccount": "Connect {{name}} account",
+        "reconnect": "Reconnect",
+        "reconnectAccount": "Reconnect {{name}} account",
+        "needsReconnect": "Your {{name}} account needs reconnecting. Deliveries are paused until then.",
+        "accessDenied": "Access to your {{name}} account wasn't granted.",
+        "connectFailed": "Couldn't connect your {{name}} account. Please try again.",
+        "account": "Account",
+        "accountLabel": "{{email}} (connected by {{name}})",
+        "accountNeedsReconnect": "{{label}} · needs reconnecting",
+        "accountMissingAccess": "{{label}} · doesn't allow {{app}} yet",
+        "connectAnother": "Connect another {{name}} account",
+        "accountShared": "Accounts are shared with everyone in this workspace.",
+        "accountsFailed": "Couldn't load the workspace's accounts."
+      },
+      "records": {
+        "title": "Recent deliveries",
+        "empty": "No submissions have been sent yet.",
+        "succeeded": "Delivered",
+        "failed": "Failed",
+        "retrying": "Retrying",
+        "attempt": "Attempt {{attempt}} of {{maxAttempts}}",
+        "waiting": "Waiting",
+        "waitingCount_one": "{{count}} submission is waiting to be sent.",
+        "waitingCount_other": "{{count}} submissions are waiting to be sent."
+      },
       "apps": {
         "webhook": {
           "description": "With webhooks integration, you can send every submission straight to any URL as soon as it's submitted.",
           "settings": {
             "endpointUrl": {
               "label": "Endpoint URL"
+            }
+          }
+        },
+        "googlesheets": {
+          "description": "Adds a row to a Google Sheets spreadsheet for every submission, with a column for each question.",
+          "settings": {
+            "createSpreadsheet": {
+              "label": "Create a new spreadsheet",
+              "description": "When you save, a spreadsheet named after this form is created in the connected Google account."
+            },
+            "spreadsheet": {
+              "label": "Spreadsheet URL",
+              "description": "The URL or ID of a spreadsheet the connected account can edit.",
+              "placeholder": "https://docs.google.com/spreadsheets/d/…"
+            },
+            "sheet": {
+              "label": "Tab",
+              "description": "Row 1 holds the column headers; HeyForm adds one for each new question.",
+              "placeholder": "First tab"
             }
           }
         }
@@ -1205,6 +1281,10 @@
         "navigationArrows": {
           "headline": "Navigation arrows",
           "subHeadline": "You can enable it to let respondents navigate between questions."
+        },
+        "openLinksInNewTab": {
+          "headline": "Open external links in a new tab",
+          "subHeadline": "When enabled, links in your questions open in a new browser tab instead of inside the embedded form, avoiding blocked or broken pages when the form is embedded on another site."
         }
       },
       "access": {
@@ -1232,6 +1312,10 @@
           "subHeadline": "You can set it here if you want to limit the number of submitting times from a same IP address in a period.",
           "times": "times",
           "inEvery": "in every"
+        },
+        "displayIpAddress": {
+          "headline": "Show respondents' IP addresses",
+          "subHeadline": "Show each respondent's IP address in the submissions table, CSV exports and webhooks."
         },
         "quotaLimit": {
           "headline": "Limit the number of submissions",
@@ -1266,6 +1350,13 @@
         "respondent": {
           "headline": "Respondent email notifications",
           "subHeadline": "Send a customized text email to respondents after form submission."
+        },
+        "recipients": {
+          "headline": "Additional recipients",
+          "subHeadline": "Also email submissions to these addresses, even if they have no HeyForm account. One address per line, up to {{max}}.",
+          "placeholder": "name@example.com",
+          "invalid": "{{email}} is not a valid email address",
+          "tooMany": "Add at most {{max}} recipients"
         }
       },
       "protection": {
@@ -1317,6 +1408,7 @@
         "website": "Website",
         "inputTable": "Input table",
         "submitDate": "Submit date",
+        "ipAddress": "IP address",
         "hiddenFields": "Hidden fields",
         "contactInfo": "Contact info",
         "choices": "Choices",
@@ -1361,6 +1453,7 @@
         "multipleSelection": "Multiple selection",
         "randomize": "Randomize",
         "allowOther": "\"Other\" option",
+        "requireOtherText": "Require text for \"Other\"",
         "total": "Total",
         "labels": "Labels",
         "leftLabel": "Left label",
@@ -1496,6 +1589,26 @@
           "assignment": "Assign (=)",
           "navigate": "Jump to",
           "calculate": "Calculate"
+        },
+        "nextQuestion": {
+          "label": "Next question",
+          "formOrder": "Next in form order",
+          "untitled": "Untitled question",
+          "description": "Used when no conditional jump matches. Choose “Next in form order” to restore the normal sequence."
+        },
+        "branching": {
+          "label": "Branch by answer",
+          "description": "Send each answer to its own question. Every answer needs a destination, and the question will be made required.",
+          "incompatible": "Turn off multiple selection to branch by answer.",
+          "destinationPlaceholder": "Choose a destination",
+          "destinationRequired": "Choose where this answer goes",
+          "untitledOption": "Option {{index}}",
+          "droppedRules_one": "1 existing jump rule can’t be matched to a single option and will be removed when you save.",
+          "droppedRules_other": "{{count}} existing jump rules can’t be matched to a single option and will be removed when you save.",
+          "incomplete": "Some answers don’t have a destination",
+          "requiredLocked": "Required while this question branches by answer",
+          "settingLocked": "Unavailable while this question branches by answer",
+          "publishError": "“{{title}}” branches by answer, so it must be required, single-select, and every answer needs a destination. Open its logic to finish setting it up."
         }
       },
       "preview": {

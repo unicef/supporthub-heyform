@@ -35,6 +35,10 @@
     "pt-br": {
       "original": "Português (Brasil)",
       "translated": "Portugiesisch (Brasilien)"
+    },
+    "es": {
+      "original": "Español",
+      "translated": "Spanisch"
     }
   },
   "timezones": {
@@ -743,6 +747,11 @@
         "label": "Geben Sie den Löschcode ein, der an <strong>{{email}}</strong> gesendet wurde.",
         "required": "Der Bestätigungscode darf nicht leer sein"
       },
+      "name": {
+        "label": "Geben Sie zur Bestätigung den Projektnamen <strong>{{name}}</strong> ein.",
+        "required": "Der Projektname darf nicht leer sein",
+        "invalid": "Geben Sie zur Bestätigung genau {{name}} ein."
+      },
       "confirm": "Projekt löschen"
     },
     "moveto": {
@@ -1142,6 +1151,10 @@
         "navigationArrows": {
           "headline": "Navigationspfeile",
           "subHeadline": "Sie können es aktivieren, um den Befragten die Navigation zwischen den Fragen zu ermöglichen."
+        },
+        "openLinksInNewTab": {
+          "headline": "Externe Links in neuem Tab öffnen",
+          "subHeadline": "Wenn aktiviert, öffnen Links in Ihren Fragen einen neuen Browser-Tab, anstatt innerhalb des eingebetteten Formulars zu laden. So vermeiden Sie blockierte oder fehlerhafte Seiten, wenn das Formular auf einer anderen Website eingebettet ist."
         }
       },
       "access": {
@@ -1169,6 +1182,10 @@
           "subHeadline": "Sie können es hier einstellen, wenn Sie die Anzahl der Einreichungen von derselben IP-Adresse in einem Zeitraum begrenzen möchten.",
           "times": "Zeiten",
           "inEvery": "in jeder"
+        },
+        "displayIpAddress": {
+          "headline": "IP-Adressen der Teilnehmer anzeigen",
+          "subHeadline": "Zeigt die IP-Adresse jedes Teilnehmers in der Tabelle der Einsendungen, in CSV-Exporten und in Webhooks an."
         },
         "quotaLimit": {
           "headline": "Begrenzen Sie die Anzahl der Einsendungen",
@@ -1203,6 +1220,13 @@
         "respondent": {
           "headline": "E-Mail-Benachrichtigungen für Teilnehmer",
           "subHeadline": "Senden Sie nach dem Ausfüllen des Formulars eine angepasste Text-E-Mail an die Teilnehmer."
+        },
+        "recipients": {
+          "headline": "Weitere Empfänger",
+          "subHeadline": "Sende Einsendungen zusätzlich an diese Adressen, auch ohne HeyForm-Konto. Eine Adresse pro Zeile, maximal {{max}}.",
+          "placeholder": "name@example.com",
+          "invalid": "{{email}} ist keine gültige E-Mail-Adresse",
+          "tooMany": "Füge höchstens {{max}} Empfänger hinzu"
         }
       },
       "protection": {
@@ -1249,6 +1273,7 @@
         "website": "Webseite",
         "inputTable": "Eingabetabelle",
         "submitDate": "Einreichungsdatum",
+        "ipAddress": "IP-Adresse",
         "hiddenFields": "Versteckte Felder",
         "contactInfo": "Kontaktinformationen",
         "choices": "Auswahlmöglichkeiten",

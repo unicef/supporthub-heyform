@@ -7,7 +7,12 @@ export { MailService } from './mail.service'
 export { PaymentService } from './payment.service'
 export { RedisService } from './redis.service'
 export { ScheduleService } from './schedule.service'
-export { SocialLoginService } from './social-login.service'
+export {
+  SocialLoginAuthorization,
+  SocialLoginCallbackContext,
+  SocialLoginKind,
+  SocialLoginService
+} from './social-login.service'
 export { SubmissionService } from './submission.service'
 export { SubmissionIpLimitService } from './submission-ip-limit.service'
 export { TeamService } from './team.service'
@@ -20,4 +25,7 @@ export { BrandKitService } from './brand-kit.service'
 export { ChangelogService } from './changelog.service'
 export { AppService } from './app.service'
 export { IntegrationService } from './integration.service'
+// Only injectable classes here: app.module registers every export as a provider
+export { IntegrationConnectionService } from './integration-connection.service'
+export { IntegrationAuthService } from './integration-auth.service'
 export { OpenAIService } from './open-ai.service'

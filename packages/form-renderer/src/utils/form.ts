@@ -28,6 +28,15 @@ export function isNotNil(arg: any): boolean {
   return !helper.isNil(arg)
 }
 
+// Whether a choice answer includes "Other": typed text, or a blank entry where that's allowed.
+export function isOtherAnswered(field: FormField, value?: { other?: string }): boolean {
+  if (!field.properties?.allowOther) {
+    return false
+  }
+
+  return helper.isValid(value?.other) || (!!field.properties.allowBlankOther && value?.other === '')
+}
+
 export function isFile(arg: any): boolean {
   return isNotNil(arg) && type(arg) === 'file'
 }
@@ -302,6 +311,10 @@ export function getNavigateFieldId(
         }
       }
     }
+  }
+
+  if (field.nextFieldId && thankYouFields.some(f => f.id === field.nextFieldId)) {
+    return field.nextFieldId
   }
 }
 

@@ -1,7 +1,7 @@
 import { ComparisonEnum, FieldKindEnum, FormField } from '@heyform-inc/shared-types-enums'
 import { expect, test } from 'vitest'
 
-import { validateCondition } from '../src'
+import { OTHER_CHOICE_ID, validateCondition } from '../src'
 
 test('validate text condition', () => {
   const field: FormField = {
@@ -122,6 +122,38 @@ test('validate single choice condition', () => {
     expect(validateCondition(field, comparison, comparison.values)).toBe(true)
   }
 })
+
+test.each([FieldKindEnum.MULTIPLE_CHOICE, FieldKindEnum.PICTURE_CHOICE])(
+  'preserves contains rules on single-select %s questions',
+  kind => {
+    const field: FormField = {
+      id: 'choice',
+      title: 'Choice',
+      kind,
+      properties: { allowMultiple: false }
+    }
+    const values = { choice: { value: ['a'] } }
+
+    for (const expected of ['a', ['a']]) {
+      expect(
+        validateCondition(field, { comparison: ComparisonEnum.CONTAINS, expected }, values)
+      ).toBe(true)
+      expect(
+        validateCondition(field, { comparison: ComparisonEnum.DOES_NOT_CONTAIN, expected }, values)
+      ).toBe(false)
+    }
+    expect(
+      validateCondition(field, { comparison: ComparisonEnum.CONTAINS, expected: 'b' }, values)
+    ).toBe(false)
+    expect(
+      validateCondition(
+        field,
+        { comparison: ComparisonEnum.DOES_NOT_CONTAIN, expected: 'b' },
+        values
+      )
+    ).toBe(true)
+  }
+)
 
 test('validate single choice with other condition', () => {
   const field: FormField = {
@@ -273,6 +305,41 @@ test('validate multiple choice condition with undefined', () => {
   for (const comparison of comparisons) {
     expect(validateCondition(field, comparison, comparison.values)).toBe(false)
   }
+})
+
+test('a rule naming "Other" matches any Other answer, typed or not', () => {
+  const field: FormField = {
+    id: 'choice',
+    kind: FieldKindEnum.MULTIPLE_CHOICE,
+    properties: {
+      allowMultiple: true,
+      allowOther: true,
+      choices: [
+        { id: '_a', label: 'A' },
+        { id: '_b', label: 'B' }
+      ]
+    }
+  }
+  const check = (comparison: ComparisonEnum, expected: unknown, value: unknown) =>
+    validateCondition(field, { comparison, expected } as any, { choice: value } as any)
+
+  for (const other of ['Anything', '']) {
+    expect(check(ComparisonEnum.IS, OTHER_CHOICE_ID, { value: [], other })).toBe(true)
+    expect(check(ComparisonEnum.IS, [OTHER_CHOICE_ID], { value: [], other })).toBe(true)
+    expect(check(ComparisonEnum.IS_NOT, OTHER_CHOICE_ID, { value: [], other })).toBe(false)
+    expect(check(ComparisonEnum.CONTAINS, [OTHER_CHOICE_ID], { value: ['_a'], other })).toBe(true)
+    expect(check(ComparisonEnum.IS, ['_a', OTHER_CHOICE_ID], { value: ['_a'], other })).toBe(true)
+  }
+
+  expect(check(ComparisonEnum.IS, OTHER_CHOICE_ID, { value: ['_a'] })).toBe(false)
+  expect(check(ComparisonEnum.IS, OTHER_CHOICE_ID, undefined)).toBe(false)
+  expect(check(ComparisonEnum.IS_NOT, OTHER_CHOICE_ID, { value: ['_a'] })).toBe(true)
+  expect(check(ComparisonEnum.DOES_NOT_CONTAIN, [OTHER_CHOICE_ID], { value: ['_a'] })).toBe(true)
+  // An option rule never matches an Other answer.
+  expect(check(ComparisonEnum.IS, '_a', { value: [], other: 'Anything' })).toBe(false)
+  // Rules written against the typed text keep comparing it.
+  expect(check(ComparisonEnum.IS, 'Anything', { value: [], other: 'Anything' })).toBe(true)
+  expect(check(ComparisonEnum.IS, 'Anything', { value: [], other: 'Else' })).toBe(false)
 })
 
 test('validate multiple choice with other condition', () => {

@@ -1,16 +1,22 @@
 import { CaptchaKindEnum, FormField, FormStatusEnum } from '@heyform-inc/shared-types-enums'
 import { InjectQueue } from '@nestjs/bull'
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable, Optional } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Queue } from 'bull'
 import { Model } from 'mongoose'
 
 import { BrandKitService } from './brand-kit.service'
+import { RedisService } from './redis.service'
 import { TeamService } from './team.service'
 import { GOOGLE_RECAPTCHA_KEY } from '@environments'
 import { helper, pickObject, timestamp } from '@heyform-inc/utils'
 import { FormModel } from '@model'
-import { mapToObject, withBrandKitTheme } from '@utils'
+import {
+  literalSearchRegex,
+  mapToObject,
+  normalizeTranslationLanguages,
+  withBrandKitTheme
+} from '@utils'
 import { getUpdateQuery } from '@utils'
 
 interface UpdateFiledOptions {
@@ -25,9 +31,12 @@ export class FormService {
     @InjectModel(FormModel.name)
     private readonly formModel: Model<FormModel>,
     private readonly teamService: TeamService,
-    private readonly brandKitService: BrandKitService,
     @InjectQueue('TranslateFormQueue')
-    private readonly translateFormQueue: Queue
+    private readonly translateFormQueue: Queue,
+    private readonly redisService: RedisService,
+    // supporthub-fork: last and @Optional so upstream's tests, which construct
+    // FormService positionally, keep compiling. Nest always provides it.
+    @Optional() private readonly brandKitService?: BrandKitService
   ) {}
 
   async findById(id: string): Promise<FormModel | null> {
@@ -53,6 +62,10 @@ export class FormService {
     }
 
     return this.formModel.find(conditions)
+  }
+
+  async findAllInProject(projectId: string): Promise<FormModel[]> {
+    return this.formModel.find({ projectId })
   }
 
   async findRecentInTeam(
@@ -83,7 +96,7 @@ export class FormService {
   async searchInTeam(teamId: string, projectIds: string[], keyword: string): Promise<FormModel[]> {
     const conditions: Record<string, any> = {
       teamId,
-      name: new RegExp(keyword, 'i')
+      name: literalSearchRegex(keyword)
     }
 
     if (helper.isValidArray(projectIds)) {
@@ -124,12 +137,16 @@ export class FormService {
     }
 
     if (keyword) {
-      conditions.name = new RegExp(keyword, 'i')
+      conditions.name = literalSearchRegex(keyword)
     }
 
     return this.formModel.find(conditions).sort({
       updatedAt: -1
     })
+  }
+
+  async findAllByIds(ids: string[]): Promise<FormModel[]> {
+    return this.formModel.find({ _id: { $in: ids } })
   }
 
   async findAllByFieldLength(maxLength = 2) {
@@ -182,7 +199,7 @@ export class FormService {
   public async create(form: FormModel | any): Promise<string> {
     // Every creation path (blank, AI, template, duplicate) lands here, so a
     // form without a theme of its own starts from the workspace brand kit.
-    const brandKit = form?.teamId ? await this.brandKitService.findByTeamId(form.teamId) : null
+    const brandKit = form?.teamId ? await this.brandKitService?.findByTeamId(form.teamId) : null
     const result = await this.formModel.create(withBrandKitTheme(form, brandKit?.theme))
     return result.id
   }
@@ -200,6 +217,19 @@ export class FormService {
       updates
     )
     return result.acknowledged
+  }
+
+  public async migrateLegacyPassword(
+    formId: string,
+    legacyPassword: string,
+    hashedPassword: string
+  ): Promise<boolean> {
+    const result = await this.formModel.updateOne(
+      { _id: formId, 'settings.password': legacyPassword },
+      { $set: { 'settings.password': hashedPassword } }
+    )
+
+    return result.modifiedCount === 1
   }
 
   public async updateMany(formIds: string[], updates: Record<string, any>): Promise<boolean> {
@@ -370,6 +400,7 @@ export class FormService {
       'enableProgress',
       'enableQuestionList',
       'enableNavigationArrows',
+      'openLinksInNewTab',
       'locale',
       'languages',
       'enableClosedMessage',
@@ -397,7 +428,9 @@ export class FormService {
 
     const team = await this.teamService.findById(form.teamId)
 
-    masked.settings.removeBranding = team.removeBranding
+    // supporthub-fork: default ON when unset, as in the publicForm resolver
+    // (form-detail.resolver.ts explains why).
+    masked.settings.removeBranding = team?.removeBranding !== false
 
     if (form.settings?.captchaKind === CaptchaKindEnum.GOOGLE_RECAPTCHA) {
       masked.settings.googleRecaptchaKey = GOOGLE_RECAPTCHA_KEY
@@ -406,12 +439,46 @@ export class FormService {
     return masked
   }
 
-  public addTranslateQueue(formId: string, languages: string[]) {
-    languages.forEach(language => {
-      this.translateFormQueue.add({
-        formId,
-        language
-      })
-    })
+  public async addTranslateQueue(
+    formId: string,
+    teamId: string,
+    userId: string,
+    languages: string[]
+  ) {
+    const normalizedLanguages = normalizeTranslationLanguages(languages)
+
+    if (normalizedLanguages.length < 1) {
+      return
+    }
+
+    // Count billed translation jobs rather than mutation calls. The user-wide budget prevents
+    // bypassing the workspace budget by creating additional workspaces.
+    await this.redisService.throttler(
+      `translate:user:${userId}`,
+      50,
+      '1h',
+      normalizedLanguages.length
+    )
+    await this.redisService.throttler(
+      `translate:team:${teamId}`,
+      50,
+      '1h',
+      normalizedLanguages.length
+    )
+
+    await Promise.all(
+      normalizedLanguages.map(language =>
+        this.translateFormQueue.add(
+          {
+            formId,
+            language
+          },
+          {
+            jobId: `translate:${formId}:${language}`,
+            removeOnFail: true
+          }
+        )
+      )
+    )
   }
 }

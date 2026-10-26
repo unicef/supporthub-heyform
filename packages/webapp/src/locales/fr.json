@@ -35,6 +35,10 @@
     "pt-br": {
       "original": "Português (Brasil)",
       "translated": "Portugais (Brésil)"
+    },
+    "es": {
+      "original": "Español",
+      "translated": "Espagnol"
     }
   },
   "timezones": {
@@ -743,6 +747,11 @@
         "label": "Entrez le code de suppression envoyé à <strong>{{email}}</strong>.",
         "required": "Le code de vérification ne doit pas être vide"
       },
+      "name": {
+        "label": "Saisissez le nom du projet <strong>{{name}}</strong> pour confirmer.",
+        "required": "Le nom du projet ne peut pas être vide",
+        "invalid": "Saisissez exactement {{name}} pour confirmer."
+      },
       "confirm": "Supprimer le projet"
     },
     "moveto": {
@@ -1174,6 +1183,10 @@
           "times": "fois",
           "inEvery": "dans chaque"
         },
+        "displayIpAddress": {
+          "headline": "Afficher les adresses IP des répondants",
+          "subHeadline": "Affiche l'adresse IP de chaque répondant dans le tableau des soumissions, les exports CSV et les webhooks."
+        },
         "quotaLimit": {
           "headline": "Limiter le nombre de soumissions",
           "subHeadline": "Cela vous permet de définir un nombre total spécifique de soumissions autorisées pour votre formulaire.",
@@ -1207,6 +1220,13 @@
         "respondent": {
           "headline": "Notifications par email aux répondants",
           "subHeadline": "Envoyez un email personnalisé aux répondants après la soumission du formulaire."
+        },
+        "recipients": {
+          "headline": "Destinataires supplémentaires",
+          "subHeadline": "Envoyez aussi les réponses à ces adresses, même sans compte HeyForm. Une adresse par ligne, {{max}} au maximum.",
+          "placeholder": "name@example.com",
+          "invalid": "{{email}} n'est pas une adresse e-mail valide",
+          "tooMany": "Ajoutez {{max}} destinataires au maximum"
         }
       },
       "protection": {
@@ -1253,6 +1273,7 @@
         "website": "Site web",
         "inputTable": "Tableau d'entrée",
         "submitDate": "Date de soumission",
+        "ipAddress": "Adresse IP",
         "hiddenFields": "Champs cachés",
         "contactInfo": "Informations de contact",
         "choices": "Choix",

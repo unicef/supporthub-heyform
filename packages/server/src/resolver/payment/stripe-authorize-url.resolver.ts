@@ -1,7 +1,9 @@
-import { Auth, FormGuard, User } from '@decorator'
+import { BadRequestException } from '@nestjs/common'
+
+import { Auth, FormGuard, Team, User } from '@decorator'
 import { FormDetailInput } from '@graphql'
 import { nanoid } from '@heyform-inc/utils'
-import { UserModel } from '@model'
+import { TeamModel, UserModel } from '@model'
 import { Args, Query, Resolver } from '@nestjs/graphql'
 import { PaymentService, RedisService } from '@service'
 
@@ -17,8 +19,15 @@ export class StripeAuthorizeUrlResolver {
   @FormGuard()
   async stripeAuthorizeUrl(
     @User() user: UserModel,
+    @Team() team: TeamModel,
     @Args('input') input: FormDetailInput
   ): Promise<string> {
+    if (!team.isOwner) {
+      throw new BadRequestException(
+        "You don't have permission to connect a Stripe account for this workspace"
+      )
+    }
+
     const state = nanoid()
     const key = `connect:stripe:${state}`
 

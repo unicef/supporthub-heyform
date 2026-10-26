@@ -30,19 +30,16 @@ export class ResetPasswordResolver {
     const user = await this.userService.findByEmail(input.email)
 
     if (helper.isEmpty(user)) {
-      throw new BadRequestException('The email address does not exist')
+      throw new BadRequestException('Invalid verification code')
     }
 
     const key = `limit:reset_password:${user.id}`
 
     await this.authService.attemptsCheck(key, async () => {
-      if (user.email !== input.email) {
-        throw new BadRequestException('The email address does not exist')
-      }
-
       const codeKey = `reset_password:${user.id}`
       await this.authService.checkVerificationCode(codeKey, input.code)
     })
+    await this.authService.clearAttempts(key)
 
     await this.userService.update(user.id, {
       password: await passwordHash(input.password, BCRYPT_SALT)

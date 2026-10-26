@@ -47,13 +47,14 @@ export class UserService {
     })
   }
 
-  static updateEmail(email: string, code: string) {
+  static updateEmail(email: string, code: string, currentPassword: string) {
     return apollo.mutate({
       mutation: UPDATE_EMAIL_GQL,
       variables: {
         input: {
           email,
-          code
+          code,
+          currentPassword
         }
       }
     })
