@@ -74,7 +74,7 @@ export class AIResolver {
    * Everything the model produces passes through here before it is stored or
    * returned:
    *
-   *  - `repairAIFieldKinds` (fork) — map aliased and unknown kinds, which
+   *  - `repairAIFieldKinds` (fork) — map the kind names other products use, which
    *    upstream's schema would reject the whole generation over.
    *  - `normalizeAIFields` (upstream) — validate and normalise the shape;
    *    throws when the output is still unusable.

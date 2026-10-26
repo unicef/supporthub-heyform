@@ -65,16 +65,16 @@ function testDropsLayoutBlocks() {
   assert.ok(repairs.some(r => r.includes('dropped layout block "text"')))
 }
 
-function testFallsBackForGenuinelyUnknownKinds() {
-  const { fields, repairs } = pipeline([field({ kind: 'slider' })])
-  assert.strictEqual(fields[0].kind, 'short_text')
-  assert.ok(repairs.some(r => r.includes('unknown kind "slider"')))
+function testLeavesGenuinelyUnknownKindsForUpstreamToReject() {
+  const { fields, repairs } = repairAIFieldKinds([field({ kind: 'slider' })])
+  assert.strictEqual((fields[0] as any).kind, 'slider')
+  assert.deepStrictEqual(repairs, [])
+  assert.throws(() => normalizeAIFields(fields))
 }
 
 function testAliasReportedAsMappingNotAsUnknownKind() {
   const { repairs } = pipeline([field({ kind: 'dropdown' })])
-  assert.ok(repairs.some(r => r.includes('mapped kind "dropdown"')))
-  assert.ok(!repairs.some(r => r.includes('unknown kind')))
+  assert.deepStrictEqual(repairs.filter(r => r.includes('kind')), ['field[0]: mapped kind "dropdown" to "multiple_choice"'])
 }
 
 function testRepairsKindsInsideGroups() {
@@ -127,7 +127,7 @@ function run() {
   testMapsParagraphToLongText()
   testNormalisesCaseOfAKnownKind()
   testDropsLayoutBlocks()
-  testFallsBackForGenuinelyUnknownKinds()
+  testLeavesGenuinelyUnknownKindsForUpstreamToReject()
   testAliasReportedAsMappingNotAsUnknownKind()
   testRepairsKindsInsideGroups()
   testFillsYesNoChoices()

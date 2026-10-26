@@ -5,8 +5,8 @@ import { nanoid } from '@heyform-inc/utils'
  * supporthub-fork: the two repairs upstream's `normalizeAIFields` does not make.
  *
  * Upstream validates the SHAPE of model output (keys, choice objects, ids,
- * titles). It does not repair the field KIND — one `single_choice` fails the
- * whole generation — and it accepts a kind with the properties it cannot work
+ * titles). It does not map the kind names other form products use — one
+ * `single_choice` fails the whole generation — and it accepts a kind with the properties it cannot work
  * without missing (a `yes_no` with no choices, a `rating` with no total), which
  * then renders broken. So the AI resolver runs:
  *
@@ -51,7 +51,7 @@ function toSnakeCase(value: string): string {
     .toLowerCase()
 }
 
-/** Before `normalizeAIFields`: map aliased and unknown kinds, drop layout blocks. */
+/** Before `normalizeAIFields`: map aliased kinds, drop layout blocks. */
 export function repairAIFieldKinds(raw: unknown, where = 'field'): AIFieldRepairResult {
   const repairs: string[] = []
   if (!Array.isArray(raw)) {
@@ -67,7 +67,7 @@ export function repairAIFieldKinds(raw: unknown, where = 'field'): AIFieldRepair
     }
 
     const value = field.kind
-    let kind: string = FieldKindEnum.SHORT_TEXT
+    let kind: unknown = value
     let pickOne = false
 
     if (typeof value === 'string' && FIELD_KINDS.has(value)) {
@@ -82,9 +82,9 @@ export function repairAIFieldKinds(raw: unknown, where = 'field'): AIFieldRepair
       kind = KIND_ALIASES[toSnakeCase(value)]
       pickOne = PICK_ONE_ALIASES.has(toSnakeCase(value))
       repairs.push(`${at}: mapped kind "${value}" to "${kind}"`)
-    } else {
-      repairs.push(`${at}: unknown kind ${JSON.stringify(value)}, fell back to "${kind}"`)
     }
+    // Anything else is left as is: upstream deliberately fails a generation
+    // that invents a kind, rather than guess what the model meant.
 
     const repaired: Record<string, any> = { ...field, kind }
     if (pickOne) {
