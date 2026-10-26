@@ -69,7 +69,7 @@ const WorkspaceSidebarComponent = () => {
     <div className="max-lg:bg-foreground flex h-full flex-col max-lg:rounded-lg">
       <div className="border-accent-light border-b p-4">
         {ssoOnly ? (
-          helper.isValid(tenantReturnUrl) && (
+          helper.isValid(tenantReturnUrl) ? (
             <a
               href={tenantReturnUrl}
               className="hf-sidebar-link"
@@ -81,7 +81,7 @@ const WorkspaceSidebarComponent = () => {
                 {t('workspace.backToTenant', { name: workspace?.name })}
               </span>
             </a>
-          )
+          ) : null
         ) : (
           <WorkspaceSwitcher />
         )}
