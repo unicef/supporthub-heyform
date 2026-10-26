@@ -426,7 +426,9 @@ export class FormService {
 
     const team = await this.teamService.findById(form.teamId)
 
-    masked.settings.removeBranding = team.removeBranding
+    // supporthub-fork: default ON when unset, as in the publicForm resolver
+    // (form-detail.resolver.ts explains why).
+    masked.settings.removeBranding = team?.removeBranding !== false
 
     if (form.settings?.captchaKind === CaptchaKindEnum.GOOGLE_RECAPTCHA) {
       masked.settings.googleRecaptchaKey = GOOGLE_RECAPTCHA_KEY
