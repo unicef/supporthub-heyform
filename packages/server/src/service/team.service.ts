@@ -20,6 +20,17 @@ export class TeamService {
     return this.teamModel.findById(id)
   }
 
+  async findJoinableByInvite(teamId: string, inviteCode: string): Promise<TeamModel | null> {
+    return this.teamModel.findOne({
+      _id: teamId,
+      inviteCode,
+      allowJoinByInviteLink: true,
+      inviteCodeExpireAt: {
+        $gt: timestamp()
+      }
+    })
+  }
+
   async findAllBy(conditions: Record<string, any>): Promise<TeamModel[]> {
     return this.teamModel.find(conditions)
   }

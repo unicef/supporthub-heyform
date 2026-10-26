@@ -4,7 +4,8 @@ import { JobOptions, Queue } from 'bull'
 import { Dirent, readFileSync, readdirSync } from 'fs'
 import { basename, extname, join } from 'path'
 
-import { EMAIL_TEMPLATES_DIR, SMTP_FROM } from '@environments'
+import { EMAIL_TEMPLATES_DIR, SMTP_FROM, SMTP_HOST, SMTP_PORT } from '@environments'
+import { htmlUtils } from '@heyform-inc/answer-utils'
 import { helper } from '@heyform-inc/utils'
 
 interface JoinWorkspaceAlertOptions {
@@ -55,6 +56,48 @@ interface UserSecurityAlertOptions {
 const HTML_EXT = '.html'
 const TEMPLATE_META_REGEX = /^---([\s\S]*?)---[\n\s\S]\n/
 const DEFAULT_LOCALE = 'en'
+const SUBMISSION_HTML_TAGS = ['ol', 'li', 'h3', 'p']
+
+interface TrustedHtml {
+  html: string
+  trusted: true
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function trustedHtml(html: string): TrustedHtml {
+  return {
+    html,
+    trusted: true
+  }
+}
+
+function isTrustedHtml(value: unknown): value is TrustedHtml {
+  return (
+    helper.isPlainObject(value) &&
+    (value as TrustedHtml).trusted === true &&
+    helper.isString((value as TrustedHtml).html)
+  )
+}
+
+function safeEmailLink(value: unknown): string {
+  try {
+    const url = new URL(String(value ?? ''))
+
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      return url.toString()
+    }
+  } catch {}
+
+  return '#'
+}
 
 @Injectable()
 export class MailService {
@@ -65,6 +108,12 @@ export class MailService {
 
   constructor(@InjectQueue('MailQueue') private readonly mailQueue: Queue) {
     this.init()
+  }
+
+  isConfigured(): boolean {
+    return Boolean(
+      SMTP_FROM?.trim() && SMTP_HOST?.trim() && Number.isInteger(SMTP_PORT) && SMTP_PORT > 0
+    )
   }
 
   async accountDeletionAlert(to: string, locale?: string) {
@@ -139,7 +188,22 @@ export class MailService {
     options: SubmissionNotificationOptions,
     locale?: string
   ) {
-    await this.addQueue('submission_notification', to, options, undefined, locale)
+    const submission = htmlUtils.purge(options.submission, {
+      allowedAttributes: [],
+      allowedBlockTags: SUBMISSION_HTML_TAGS,
+      allowedTags: ['text']
+    })
+
+    await this.addQueue(
+      'submission_notification',
+      to,
+      {
+        ...options,
+        submission: trustedHtml(submission)
+      },
+      undefined,
+      locale
+    )
   }
 
   async teamDataExportReady(to: string, link: string) {
@@ -222,7 +286,7 @@ export class MailService {
   private async addQueue(
     templateName: string,
     to: string,
-    replacements?: Record<string, any>,
+    replacements?: object,
     options?: JobOptions,
     locale = DEFAULT_LOCALE
   ) {
@@ -238,12 +302,15 @@ export class MailService {
     let html = result!.html
 
     if (helper.isValid(replacements) && helper.isPlainObject(replacements)) {
-      Object.keys(replacements!).forEach(key => {
-        const value = replacements![key]
-        const regex = new RegExp(`{${key}}`, 'g')
+      Object.entries(replacements!).forEach(([key, value]) => {
+        const placeholder = `{${key}}`
+        const textValue = isTrustedHtml(value) ? value.html : String(value ?? '')
+        const htmlValue = isTrustedHtml(value)
+          ? value.html
+          : escapeHtml(key === 'link' ? safeEmailLink(value) : value)
 
-        subject = subject.replace(regex, value)
-        html = html?.replace(regex, value)
+        subject = subject.split(placeholder).join(textValue.replace(/[\r\n]+/g, ' '))
+        html = html?.split(placeholder).join(htmlValue)
       })
     }
 

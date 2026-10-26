@@ -225,7 +225,12 @@ export class FormService {
     })
   }
 
-  static updateFormSchemas(input: { formId: string; drafts: AnyMap[]; version: number }) {
+  static updateFormSchemas(input: {
+    formId: string
+    drafts: AnyMap[]
+    logics?: Logic[]
+    version: number
+  }) {
     return apollo.mutate({
       mutation: UPDATE_FORM_SCHEMAS_GQL,
       variables: {
@@ -234,7 +239,12 @@ export class FormService {
     })
   }
 
-  static publishForm(input: { formId: string; drafts: AnyMap[]; version: number }) {
+  static publishForm(input: {
+    formId: string
+    drafts: AnyMap[]
+    logics?: Logic[]
+    version: number
+  }) {
     return apollo.mutate({
       mutation: PUBLISH_FORM_SQL,
       variables: {
@@ -303,7 +313,12 @@ export class FormService {
     })
   }
 
-  static updateTheme(input: { formId: string; theme: FormTheme; logo?: string }) {
+  static updateTheme(input: {
+    formId: string
+    theme: FormTheme
+    logo?: string
+    favicon?: string | null
+  }) {
     return apollo.mutate({
       mutation: UPDATE_FORM_THEME_GQL,
       variables: {
@@ -437,12 +452,7 @@ export class FormService {
   static templates(): Promise<TemplateType[]> {
     return apollo.query({
       query: TEMPLATES_GQL,
-      fetchPolicy: 'cache-first',
-      variables: {
-        input: {
-          limit: 0
-        }
-      }
+      fetchPolicy: 'cache-first'
     })
   }
 
@@ -457,7 +467,7 @@ export class FormService {
     })
   }
 
-  static useTemplate(input: { projectId: string; templateId: string; recordId: string }) {
+  static useTemplate(input: { projectId: string; templateId: string }) {
     return apollo.mutate({
       mutation: USE_TEMPLATE_GQL,
       variables: {

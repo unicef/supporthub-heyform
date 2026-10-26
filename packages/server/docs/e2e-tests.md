@@ -30,7 +30,6 @@ packages/server/test/e2e/
 ├── permission-matrix.e2e.test.ts          # role-based permission matrix (programmatic)
 ├── rate-limit.e2e.test.ts                 # login lockout, code-resend cooldown (LAST)
 ├── stateful-edges.e2e.test.ts             # version, trash/restore, cross-team, invite/ownership
-├── static-upload.e2e.test.ts              # PNG upload via /api/upload
 ├── team-flow.e2e.test.ts                  # stateful admin/COLLABORATOR/MEMBER lifecycle
 └── scripts/
     └── run-with-docker.js                 # docker compose wrapper
@@ -97,15 +96,14 @@ APP_HOMEPAGE_URL=http://localhost:9157
 | 1     | `health`             | 2             | `/health`, `/health/ready` reports mongo + redis up.                                                 |
 | 2     | `auth`               | 9             | DeviceId guard, sign-up (cookies, `userDetail`), duplicate-email, weak password, login Query, wrong password, missing account, unauthenticated `userDetail`, `/logout`. |
 | 3     | `catalog`            | 3             | `apps` (public), `templates` (auth-only), unauthenticated `templates` rejected.                      |
-| 4     | `static & upload`    | 1             | PNG upload happy path via `/api/upload`.                                                             |
-| 5     | `input validation`   | 16            | Empty/oversize names, malformed emails, missing required fields, invalid enum values, weak password. |
-| 6     | `auth flows`         | 7             | `updateUserPassword` rotation + wrong-currentPassword + weak-newPassword, `sendResetPasswordEmail`+`resetPassword` end-to-end (code read from Redis), session retained after `removeTeamMember` but team scope lost. |
-| 7     | `stateful edges`     | 13            | Stale-version rejection on `updateFormSchemas`/`publishForm`, idempotent double-trash, `restoreForm` on NORMAL form is a no-op, **`deleteForm` returns true even on NORMAL form (server bug)**, cross-team `formDetail`/`forms` leakage forbidden, `joinTeam` failures (wrong code / already joined / rotated code), `leaveTeam` blocks the owner, `removeTeamMember` refuses the owner, `transferTeam` to non-member rejected, `openForm` on unpublished form, `completeSubmission` with bad `openToken`. |
-| 8     | `team flow`          | 15            | Stateful admin → COLLABORATOR (joins by invite) → MEMBER (seeded) → workspace → project → form → publish → submit → archive → delete form → delete project → dissolve team. Cookies reused; no re-auth. |
-| 9     | `permission matrix`  | 205           | Programmatic table: each GraphQL op × six callers (admin/collaborator/member/teamOnly/outsider/anonymous). Asserts pass/fail against actual resolver behaviour. ~34 operations covered. |
-| 10    | `rate limit`         | 3             | Login locks the user out after 5 wrong passwords (15-min window); `sendResetPasswordEmail` 60s per-user cooldown. Runs **last** because it burns per-user attempt counters. |
+| 4     | `input validation`   | 16            | Empty/oversize names, malformed emails, missing required fields, invalid enum values, weak password. |
+| 5     | `auth flows`         | 7             | `updateUserPassword` rotation + wrong-currentPassword + weak-newPassword, `sendResetPasswordEmail`+`resetPassword` end-to-end (code read from Redis), session retained after `removeTeamMember` but team scope lost. |
+| 6     | `stateful edges`     | 13            | Stale-version rejection on `updateFormSchemas`/`publishForm`, idempotent double-trash, `restoreForm` on NORMAL form is a no-op, **`deleteForm` returns true even on NORMAL form (server bug)**, cross-team `formDetail`/`forms` leakage forbidden, `joinTeam` failures (wrong code / already joined / rotated code), `leaveTeam` blocks the owner, `removeTeamMember` refuses the owner, `transferTeam` to non-member rejected, `openForm` on unpublished form, `completeSubmission` with bad `openToken`. |
+| 7     | `team flow`          | 15            | Stateful admin → COLLABORATOR (joins by invite) → MEMBER (seeded) → workspace → project → form → publish → submit → archive → delete form → delete project → dissolve team. Cookies reused; no re-auth. |
+| 8     | `permission matrix`  | 205           | Programmatic table: each GraphQL op × six callers (admin/collaborator/member/teamOnly/outsider/anonymous). Asserts pass/fail against actual resolver behaviour. ~34 operations covered. |
+| 9     | `rate limit`         | 3             | Login locks the user out after 5 wrong passwords (15-min window); `sendResetPasswordEmail` 60s per-user cooldown. Runs **last** because it burns per-user attempt counters. |
 
-**Total: ~274 cases, completes in ≈ 6s** against a warm dockerised stack.
+**Total: ~276 cases, completes in ≈ 6s** against a warm dockerised stack.
 
 ### Caller identities in `permission matrix`
 

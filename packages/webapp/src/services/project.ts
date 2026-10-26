@@ -50,7 +50,7 @@ export class ProjectService {
   }
 
   static deleteCode(projectId: string) {
-    return apollo.query({
+    return apollo.query<boolean>({
       query: DELETE_PROJECT_CODE_GQL,
       variables: {
         input: {
@@ -61,13 +61,13 @@ export class ProjectService {
     })
   }
 
-  static delete(projectId: string, code: string) {
+  static delete(projectId: string, confirmation: { code?: string; name?: string }) {
     return apollo.mutate({
       mutation: DELETE_PROJECT_GQL,
       variables: {
         input: {
           projectId,
-          code
+          ...confirmation
         }
       }
     })

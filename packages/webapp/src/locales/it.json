@@ -35,6 +35,10 @@
     "pt-br": {
       "original": "Português (Brasil)",
       "translated": "Portoghese brasiliano"
+    },
+    "es": {
+      "original": "Español",
+      "translated": "Spagnolo"
     }
   },
   "timezones": {
@@ -749,6 +753,11 @@
         "label": "Inserisci il codice di eliminazione inviato a <strong>{{email}}</strong>.",
         "required": "Il codice di verifica non può essere vuoto"
       },
+      "name": {
+        "label": "Inserisci il nome del progetto <strong>{{name}}</strong> per confermare.",
+        "required": "Il nome del progetto non può essere vuoto",
+        "invalid": "Inserisci esattamente {{name}} per confermare."
+      },
       "confirm": "Elimina progetto"
     }
   },
@@ -1232,6 +1241,10 @@
           "times": "volte",
           "inEvery": "ogni"
         },
+        "displayIpAddress": {
+          "headline": "Mostra gli indirizzi IP dei partecipanti",
+          "subHeadline": "Mostra l'indirizzo IP di ogni partecipante nella tabella degli invii, nelle esportazioni CSV e nei webhook."
+        },
         "quotaLimit": {
           "headline": "Limita il numero di invii",
           "subHeadline": "Ti permette di impostare un numero massimo totale di invii consentiti per il modulo.",
@@ -1265,6 +1278,13 @@
         "respondent": {
           "headline": "Notifiche email ai rispondenti",
           "subHeadline": "Invia un'email di testo personalizzata ai rispondenti dopo l'invio del modulo."
+        },
+        "recipients": {
+          "headline": "Destinatari aggiuntivi",
+          "subHeadline": "Invia le risposte anche a questi indirizzi, anche senza un account HeyForm. Un indirizzo per riga, massimo {{max}}.",
+          "placeholder": "name@example.com",
+          "invalid": "{{email}} non è un indirizzo e-mail valido",
+          "tooMany": "Aggiungi al massimo {{max}} destinatari"
         }
       },
       "protection": {
@@ -1316,6 +1336,7 @@
         "website": "Sito web",
         "inputTable": "Tabella di input",
         "submitDate": "Data di invio",
+        "ipAddress": "Indirizzo IP",
         "hiddenFields": "Campi nascosti",
         "contactInfo": "Informazioni di contatto",
         "choices": "Scelte",

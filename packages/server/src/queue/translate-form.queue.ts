@@ -8,25 +8,13 @@ import { openAIClientOptions } from '../service/open-ai.service'
 import { htmlUtils } from '@heyform-inc/answer-utils'
 import { helper } from '@heyform-inc/utils'
 import { FormService } from '@service'
-import { parseAIJson } from '@utils'
+import { TRANSLATION_LANGUAGE_NAMES, parseAIJson } from '@utils'
 
 import { BaseQueue } from './base.queue'
 
 interface TranslateFormQueueJob {
   formId: string
   language: string
-}
-
-const LANGUAGES = {
-  en: 'English',
-  de: 'German',
-  fr: 'French',
-  it: 'Italian',
-  pl: 'Polish',
-  'pt-br': 'Brazilian Portuguese',
-  tr: 'Turkish',
-  'zh-cn': 'Simplified Chinese',
-  'zh-tw': 'Traditional Chinese'
 }
 
 @Processor('TranslateFormQueue')
@@ -89,7 +77,7 @@ export class TranslateFormQueue extends BaseQueue {
         messages: [
           {
             role: 'user',
-            content: `Translate this JSON to ${LANGUAGES[language]}, and keep all HTML tags and their attributes!`
+            content: `Translate this JSON to ${TRANSLATION_LANGUAGE_NAMES[language]}, and keep all HTML tags and their attributes!`
           },
           {
             role: 'user',

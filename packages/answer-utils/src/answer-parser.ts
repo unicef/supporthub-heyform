@@ -4,6 +4,7 @@ import Big from 'big.js'
 import { helper } from '@heyform-inc/utils'
 
 import { CURRENCY_SYMBOLS } from './consts'
+import { otherChoiceText } from './helper'
 
 function fileUpload(answer: Answer, livePreview = false) {
   if (livePreview) {
@@ -37,7 +38,7 @@ function singleChoice(answer: Answer): string {
 function multipleChoice(answer: Answer): string {
   return (answer.properties?.choices?.filter(row => answer.value?.value.includes(row.id)) || [])
     .map(row => row.label)
-    .concat([answer.value?.other])
+    .concat([otherChoiceText(answer.value?.other, answer.properties) ?? ''])
     .filter(row => helper.isValid(row))
     .join(', ')
 }
@@ -73,11 +74,11 @@ function dateRange(answer: Answer): string {
 function inputTable(answer: Answer): string {
   const columns = answer.properties?.tableColumns
 
-  if (helper.isValidArray(columns)) {
+  if (helper.isValidArray(columns) && helper.isArray(answer.value)) {
     const result: string[] = []
 
     answer.value.forEach((values: Record<string, string>) => {
-      if (helper.isValid(values)) {
+      if (helper.isPlainObject(values)) {
         const row = columns!.map(column => values[column.id]).join(', ')
         result.push(row)
       }

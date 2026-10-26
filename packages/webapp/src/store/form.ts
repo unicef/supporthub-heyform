@@ -1,9 +1,5 @@
 import { getTheme } from '@heyform-inc/form-renderer'
-import {
-  FormSettings,
-  ThemeSettings,
-  UNSELECTABLE_FIELD_KINDS
-} from '@heyform-inc/shared-types-enums'
+import { FormSettings, UNSELECTABLE_FIELD_KINDS } from '@heyform-inc/shared-types-enums'
 import { type Dayjs } from 'dayjs'
 import { create } from 'zustand'
 import computed from 'zustand-computed'
@@ -14,9 +10,15 @@ import { helper } from '@heyform-inc/utils'
 import { immer } from 'zustand/middleware/immer'
 
 import { TypeNumberValue } from '@/components'
-import { APP_STATUS_ENUM, DEFAULT_EMBED_CONFIGS } from '@/consts'
+import { APP_STATUS_ENUM, DEFAULT_EMBED_CONFIGS, INTEGRATION_STATUS_ENUM } from '@/consts'
 import { DEFAULT_LNG } from '@/i18n'
-import { AppType, FormType, IntegratedAppType, IntegrationType } from '@/types'
+import {
+  AppType,
+  FormType,
+  IntegratedAppType,
+  IntegrationType,
+  FormThemeSettings as ThemeSettings
+} from '@/types'
 
 interface TempSettings extends FormSettings {
   closeForm?: boolean
@@ -24,6 +26,9 @@ interface TempSettings extends FormSettings {
   endDate?: Dayjs
   _timeLimit?: TypeNumberValue
   _ipLimitTime?: TypeNumberValue
+  enableEmailNotification?: boolean
+  notificationRecipients?: string[]
+  _notificationRecipients?: string
   captcha?: string
   enableRespondentNotification?: boolean
 }
@@ -76,7 +81,12 @@ const computeState = (state: FormStoreType): ComputedStoreType => {
 
     let status = APP_STATUS_ENUM.PENDING
 
-    if (helper.isValid(integration?.config)) {
+    // Connecting an OAuth2 account creates a pending integration with no
+    // config; it counts as set up once its settings are saved
+    if (
+      helper.isValid(integration?.config) ||
+      (integration && integration.status !== INTEGRATION_STATUS_ENUM.PERMITTED)
+    ) {
       status = APP_STATUS_ENUM.ACTIVE
     }
 
@@ -151,6 +161,10 @@ export const useFormStore = create<FormStoreType>()(
               tempSettings._ipLimitTime = parseDuration(tempSettings.ipLimitTime)
             }
 
+            if (helper.isValidArray(tempSettings.notificationRecipients)) {
+              tempSettings._notificationRecipients = tempSettings.notificationRecipients!.join('\n')
+            }
+
             state.tempSettings = tempSettings
           }
 
@@ -208,7 +222,7 @@ export const useFormStore = create<FormStoreType>()(
           state.themeSettings = {
             ...state.themeSettings,
             ...updates,
-            theme: getTheme(updates.theme)
+            theme: getTheme(updates.theme ?? state.themeSettings?.theme)
           }
         })
       },
@@ -216,7 +230,7 @@ export const useFormStore = create<FormStoreType>()(
       revertThemeSettings: () => {
         set(state => {
           state.themeSettings = {
-            ...state.themeSettings,
+            ...state.form?.themeSettings,
             theme: getTheme(state.form?.themeSettings?.theme)
           }
         })

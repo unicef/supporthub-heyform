@@ -15,7 +15,11 @@ const UPLOAD_FIELD_KINDS = [FieldKindEnum.SIGNATURE, FieldKindEnum.FILE_UPLOAD]
 export class Uploader {
   private fields: UploaderField[] = []
 
-  constructor(form: FormModel, values: Any) {
+  constructor(
+    private readonly form: FormModel,
+    values: Any,
+    private readonly openToken: string
+  ) {
     flattenFields(form.fields).forEach(row => {
       if (UPLOAD_FIELD_KINDS.includes(row.kind)) {
         let value = values[row.id]
@@ -56,10 +60,14 @@ export class Uploader {
   }
 
   async uploadFile(field: UploaderField): Promise<Record<string, FileUploadValue | string>> {
-    const { url } = await UploadService.upload(field.value as File)
+    const result = await UploadService.upload(field.value as File, {
+      fieldId: field.id,
+      formId: this.form.id,
+      openToken: this.openToken
+    })
 
     return {
-      [field.id]: url
+      [field.id]: field.kind === FieldKindEnum.SIGNATURE ? result.url : result
     }
   }
 

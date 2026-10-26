@@ -8,6 +8,9 @@ import { gravatar } from '../gravatar'
 
 export interface UserInfo {
   openId: string
+  issuer?: string
+  subject?: string
+  emailVerified?: boolean
   user: {
     email?: string
     name: string

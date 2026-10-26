@@ -133,12 +133,8 @@ export class E2EClient {
    * Upload a single file via multipart/form-data to a REST endpoint.
    * Mirrors what the upload controller expects via `multer.single('file')`.
    *
-   * Forces `Connection: close` because multer 1.x doesn't always drain the
-   * request body after a fileFilter rejection. When a previous upload
-   * succeeds on the same keep-alive socket, undici can reuse a connection
-   * whose state is half-consumed and the next upload hangs for ~5 minutes
-   * (the runner's idle-socket timeout) before fetch errors out. Closing the
-   * connection after each upload sidesteps that entirely.
+   * Forces `Connection: close` so failed multipart uploads don't leave a
+   * keep-alive socket in a surprising state for the next fetch.
    */
   async uploadFile(
     path: string,

@@ -69,13 +69,12 @@ export function build(baseUrl: string) {
   })
 
   // ── sendResetPasswordEmail + resetPassword ───────────────────────────────
-  test('sendResetPasswordEmail rejects an unknown email', async () => {
+  test('sendResetPasswordEmail does not reveal an unknown email', async () => {
     const c = new E2EClient({ baseUrl })
-    const res = await c.gql('sendResetPasswordEmail', SEND_RESET_EMAIL_GQL, {
+    const ok = await c.gqlOk<boolean>('sendResetPasswordEmail', SEND_RESET_EMAIL_GQL, {
       input: { email: `no-such-user-${Date.now()}@heyform.com` }
     })
-    assert.ok(res.errors.length > 0)
-    assert.match(res.errors[0].message, /does not exist/i)
+    assert.strictEqual(ok, true)
   })
 
   test('resetPassword end-to-end: request code, reset, login with new password', async () => {

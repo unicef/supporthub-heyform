@@ -3,11 +3,12 @@ import {
   SubmissionCategoryEnum,
   SubmissionStatusEnum
 } from '@heyform-inc/shared-types-enums'
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
 
 import { FormService } from './form.service'
+import { RedisService } from './redis.service'
 import { date, helper } from '@heyform-inc/utils'
 import { SubmissionModel } from '@model'
 import { getUpdateQuery } from '@utils'
@@ -20,6 +21,8 @@ interface FindSubmissionOptions {
   labelId?: string
   page?: number
   limit?: number
+  // Load the respondent's IP address too
+  withIp?: boolean
 }
 
 interface UpdateCategoryOptions {
@@ -28,12 +31,23 @@ interface UpdateCategoryOptions {
   category: SubmissionCategoryEnum
 }
 
+// Matches a submission's answer to a field; otherOnly keeps answers with typed "Other" text.
+function answerMatch(fieldId: string, otherOnly: boolean) {
+  return {
+    $elemMatch: {
+      id: fieldId,
+      ...(otherOnly && { 'value.other': { $type: 'string', $ne: '' } })
+    }
+  }
+}
+
 @Injectable()
 export class SubmissionService {
   constructor(
     @InjectModel(SubmissionModel.name)
     private readonly submissionModel: Model<SubmissionModel>,
-    private readonly formService: FormService
+    private readonly formService: FormService,
+    private readonly redisService: RedisService
   ) {}
 
   async findById(id: string): Promise<SubmissionModel | null> {
@@ -52,7 +66,8 @@ export class SubmissionService {
     category,
     labelId,
     page = 1,
-    limit = 30
+    limit = 30,
+    withIp = false
   }: FindSubmissionOptions): Promise<SubmissionModel[]> {
     const conditions: Record<string, any> = {
       formId,
@@ -69,6 +84,7 @@ export class SubmissionService {
 
     return this.submissionModel
       .find(conditions)
+      .select(withIp ? {} : { ip: 0 })
       .skip((page - 1) * limit)
       .limit(limit)
       .sort({
@@ -76,10 +92,10 @@ export class SubmissionService {
       })
   }
 
-  async countAllWithFieldId(formId: string, fieldId: string): Promise<number> {
+  async countAllWithFieldId(formId: string, fieldId: string, otherOnly = false): Promise<number> {
     return this.submissionModel.countDocuments({
       formId,
-      'answers.id': fieldId,
+      answers: answerMatch(fieldId, otherOnly),
       status: SubmissionStatusEnum.PUBLIC
     })
   }
@@ -88,13 +104,10 @@ export class SubmissionService {
     formId: string,
     fieldId: string,
     page = 1,
-    limit = 30
+    limit = 30,
+    otherOnly = false
   ): Promise<SubmissionModel[]> {
-    const answers = {
-      $elemMatch: {
-        id: fieldId as string
-      }
-    }
+    const answers = answerMatch(fieldId, otherOnly)
     const projections = {
       id: 1,
       answers,
@@ -257,6 +270,29 @@ export class SubmissionService {
     return result.id
   }
 
+  public async createWithinQuota(
+    submission: SubmissionModel | any,
+    quotaLimit?: number
+  ): Promise<string> {
+    if (!Number.isSafeInteger(quotaLimit) || quotaLimit! < 1) {
+      return this.create(submission)
+    }
+
+    // Serialize the authoritative Mongo count and insert. Unlike a second counter, this cannot
+    // drift when submissions are deleted, imported, or a write fails after reserving a slot.
+    return this.redisService.withLock(`submission-quota:${submission.formId}`, '30s', async () => {
+      const count = await this.countInForm(submission.formId)
+
+      if (count >= quotaLimit!) {
+        throw new BadRequestException(
+          'The submission quota exceeds, new submissions are no longer accepted'
+        )
+      }
+
+      return this.create(submission)
+    })
+  }
+
   public async maskAsPrivate(formId: string, submissionIds?: string[]): Promise<boolean> {
     const conditions: any = {
       formId
@@ -334,7 +370,7 @@ export class SubmissionService {
     return this.submissionModel.find(conditions)
   }
 
-  async findAllByForm(formId: string): Promise<SubmissionModel[]> {
+  async findAllByForm(formId: string, withIp = false): Promise<SubmissionModel[]> {
     let submissions = []
     const limit = 1000
     const submissionCount = await this.count({
@@ -345,7 +381,8 @@ export class SubmissionService {
       submissions = await this.findAll({
         formId,
         page: 1,
-        limit
+        limit,
+        withIp
       })
     } else {
       const promises = []
@@ -356,7 +393,8 @@ export class SubmissionService {
           this.findAll({
             formId,
             page: i,
-            limit
+            limit,
+            withIp
           })
         )
       }

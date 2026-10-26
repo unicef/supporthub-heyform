@@ -39,7 +39,12 @@ export interface FormSettings {
   enableIpLimit?: boolean
   ipLimitCount?: number
   ipLimitTime?: number
+  displayIpAddress?: boolean
   enableProgress?: boolean
+
+  // Email notification
+  enableEmailNotification?: boolean
+  notificationRecipients?: string[]
 
   // Translation
   locale?: string
@@ -48,6 +53,9 @@ export interface FormSettings {
   // Question navigation
   enableQuestionList?: boolean
   enableNavigationArrows?: boolean
+
+  // Links
+  openLinksInNewTab?: boolean
 
   // Metadata
   metaTitle?: string
@@ -112,6 +120,8 @@ export interface Property {
 
   // Choice
   allowOther?: boolean
+  // Lets a respondent choose "Other" without typing anything. Text is required when unset.
+  allowBlankOther?: boolean
   allowMultiple?: boolean
   choices?: Choice[]
   randomize?: boolean
@@ -177,6 +187,8 @@ export interface Validation {
 
 export interface FormField {
   id: string
+  // Unconditional destination, used when no conditional navigation rule matches.
+  nextFieldId?: string
   title?: string | any[]
   description?: string | any[]
   kind: FieldKindEnum
@@ -224,6 +236,7 @@ export interface FormTheme {
 }
 
 export interface ThemeSettings {
+  favicon?: string | null
   logo?: string
   theme?: FormTheme
 }
@@ -444,4 +457,6 @@ export interface LogicPayload {
 export interface Logic {
   fieldId: string
   payloads: LogicPayload[]
+  // Choice questions only: send every answer to its own question via one "is" jump each.
+  branchByAnswer?: boolean
 }

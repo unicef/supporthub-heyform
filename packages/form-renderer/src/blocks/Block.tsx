@@ -51,7 +51,21 @@ const ALLOWED_ATTRIBUTES = [
   'contenteditable',
   'id'
 ]
-const UNSAFE_URL_PROTOCOL_REGEX = /^\s*(?:javascript|vbscript|data):/i
+const UNSAFE_URL_PROTOCOLS = new Set(['javascript', 'vbscript', 'data'])
+const URL_PROTOCOL_CONTROL_CHARS_REGEX = /[\u0000-\u001f\u007f\s]+/g
+
+function isUnsafeUrlProtocol(value: unknown): boolean {
+  const matched = String(value || '')
+    .trimStart()
+    .match(/^([^:]+):/)
+
+  if (!matched) {
+    return false
+  }
+
+  const protocol = matched[1].replace(URL_PROTOCOL_CONTROL_CHARS_REGEX, '').toLowerCase()
+  return UNSAFE_URL_PROTOCOLS.has(protocol)
+}
 
 function escapeText(value: unknown): string {
   return String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -75,7 +89,7 @@ function sanitizeAttributes(attributes: Record<string, any> = {}): Record<string
 
     const value = String(attributes[key] || '')
 
-    if (key === 'href' && UNSAFE_URL_PROTOCOL_REGEX.test(value)) {
+    if (key === 'href' && isUnsafeUrlProtocol(value)) {
       continue
     }
 
@@ -123,13 +137,15 @@ function sanitizeRichTextNodes(nodes: unknown[]): any[] {
   return nodes.map(sanitizeRichTextNode).filter(Boolean)
 }
 
-function sanitizeRichTextHTML(value: unknown): string {
+function sanitizeRichTextHTML(value: unknown, openLinksInNewTab?: boolean): string {
   if (Array.isArray(value)) {
-    return htmlUtils.serialize(sanitizeRichTextNodes(value))
+    return htmlUtils.serialize(sanitizeRichTextNodes(value), { openLinksInNewTab })
   }
 
   if (typeof value === 'string') {
-    return htmlUtils.serialize(sanitizeRichTextNodes(htmlUtils.parse(value)))
+    return htmlUtils.serialize(sanitizeRichTextNodes(htmlUtils.parse(value)), {
+      openLinksInNewTab
+    })
   }
 
   return ''
@@ -148,17 +164,21 @@ export const Block: FC<BlockProps> = ({
   const { values, fields, query, variables } = state
   const bodyRef = useRef<HTMLDivElement>(null)
 
+  const openLinksInNewTab = state.settings?.openLinksInNewTab
+
   const field: IFormField = useMemo(
     () => ({
       ...rawField,
       title: sanitizeRichTextHTML(
-        replaceHTML(rawField.title as string, values, fields, query, variables)
+        replaceHTML(rawField.title as string, values, fields, query, variables),
+        openLinksInNewTab
       ),
       description: sanitizeRichTextHTML(
-        replaceHTML(rawField.description as string, values, fields, query, variables)
+        replaceHTML(rawField.description as string, values, fields, query, variables),
+        openLinksInNewTab
       )
     }),
-    [fields, query, rawField, values, variables]
+    [fields, openLinksInNewTab, query, rawField, values, variables]
   )
 
   const isInlineLayout = field.layout?.align === FieldLayoutAlignEnum.INLINE

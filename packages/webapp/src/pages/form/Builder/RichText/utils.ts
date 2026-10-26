@@ -12,6 +12,13 @@ export interface RichTextPreceding {
   text?: string
 }
 
+export interface RichTextMention {
+  className: 'hiddenfield' | 'mention' | 'variable'
+  dataAttribute: 'data-hiddenfield' | 'data-mention' | 'data-variable'
+  id: string
+  label: string
+}
+
 export function placeCaretAtEnd(el: HTMLElement) {
   const isTargetFocused = document.activeElement === el
 
@@ -130,7 +137,7 @@ export function insertClipboardHTML(event: ClipboardEvent) {
 export function replaceTriggerText(
   target: HTMLElement,
   triggerSelection: RichTextTriggerSelection,
-  template: string
+  mention: RichTextMention
 ) {
   const selection = window.getSelection()
 
@@ -141,65 +148,26 @@ export function replaceTriggerText(
     range.setEnd(triggerSelection.anchorNode, triggerSelection.endOffset!)
     range.deleteContents()
 
-    const temp = document.createElement('span')
-    temp.innerHTML = template
-
-    const nodes = Array.from(temp.childNodes)
-    const lastNode = nodes[nodes.length - 1]
+    const mentionNode = document.createElement('span')
+    const trailingSpace = document.createTextNode('\xA0')
     const frag = document.createDocumentFragment()
 
-    nodes.forEach(node => {
-      frag.appendChild(node)
-    })
+    mentionNode.className = mention.className
+    mentionNode.setAttribute(mention.dataAttribute, mention.id)
+    mentionNode.contentEditable = 'false'
+    mentionNode.textContent = `@${mention.label}`
+    frag.appendChild(mentionNode)
+    frag.appendChild(trailingSpace)
 
     range.insertNode(frag)
 
     range = range.cloneRange()
-    range.setStartAfter(lastNode)
+    range.setStartAfter(trailingSpace)
     range.collapse(true)
     selection.removeAllRanges()
     selection.addRange(range)
 
     target.focus()
-  }
-}
-
-export function pasteHtml(
-  ref: HTMLElement,
-  anchorNode: Node,
-  startOffset: number,
-  endOffset: number,
-  html: string
-) {
-  const selection = window.getSelection()
-
-  if (selection) {
-    let range = document.createRange()
-
-    range.setStart(anchorNode, startOffset)
-    range.setEnd(anchorNode, endOffset)
-    range.deleteContents()
-
-    const el = document.createElement('div')
-    el.innerHTML = html
-
-    const nodes = Array.from(el.childNodes)
-    const lastNode = nodes[nodes.length - 1]
-    const frag = document.createDocumentFragment()
-
-    nodes.forEach(node => {
-      frag.appendChild(node)
-    })
-
-    range.insertNode(frag)
-
-    range = range.cloneRange()
-    range.setStartAfter(lastNode)
-    range.collapse(true)
-    selection.removeAllRanges()
-    selection.addRange(range)
-
-    ref.focus()
   }
 }
 

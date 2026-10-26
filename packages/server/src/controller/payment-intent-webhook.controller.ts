@@ -24,7 +24,7 @@ export class PaymentIntentWebhookController {
   }
 
   private async _paymentIntentSucceeded(object: any) {
-    const { id: paymentIntentId, client_secret: clientSecret, metadata } = object
+    const { id: paymentIntentId, metadata } = object
 
     if (helper.isEmpty(metadata) || helper.isEmpty(metadata.submissionId)) {
       throw new BadRequestException('Invalid payment metadata')
@@ -43,16 +43,14 @@ export class PaymentIntentWebhookController {
       throw new BadRequestException('Field not found')
     }
 
-    if (answer.value.clientSecret !== clientSecret) {
-      throw new BadRequestException('Invalid client data')
-    }
-
     const charge = object.charges.data[0]
+    const answerValue = { ...answer.value }
+    delete answerValue.clientSecret
 
     await this.submissionService.updateAnswer(submissionId, {
       ...answer,
       value: {
-        ...answer.value,
+        ...answerValue,
         paymentIntentId,
         billingDetails: {
           name: charge.billing_details.name

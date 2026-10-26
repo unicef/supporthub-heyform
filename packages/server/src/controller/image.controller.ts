@@ -1,19 +1,55 @@
 import { Controller, Get, Query, Res } from '@nestjs/common'
 import type { Response } from 'express'
-import { createReadStream, promises } from 'fs'
 import got from 'got'
-import type { Response as GotResponse } from 'got'
-import { resolve } from 'path'
-import * as sharp from 'sharp'
+import type { IncomingHttpHeaders } from 'http'
 import { Readable } from 'stream'
 
+import { MAX_REMOTE_IMAGE_BYTES, SafeImageResult, sanitizeRemoteImage } from '@config'
 import { ALLOWED_IMAGE_HOSTS, FIRST_PARTY_IMAGE_ORIGINS, ImageResizingDto } from '@dto'
-import { UPLOAD_DIR } from '@environments'
-import { qs } from '@heyform-inc/utils'
-import { Logger, assertSafeOutboundUrl, md5 } from '@utils'
+import { Logger, SafeOutboundRequest, assertSafeOutboundRequest } from '@utils'
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
+}
+
+async function fetchRemoteImage(
+  url: URL,
+  lookup: SafeOutboundRequest['lookup']
+): Promise<{ body: Buffer; headers: IncomingHttpHeaders }> {
+  const request = got.stream(url, {
+    followRedirect: false,
+    lookup,
+    retry: {
+      limit: 0
+    },
+    timeout: {
+      request: 10_000
+    }
+  })
+  const chunks: Buffer[] = []
+  let headers: IncomingHttpHeaders = {}
+  let size = 0
+
+  request.once('response', response => {
+    headers = response.headers
+  })
+
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    size += buffer.length
+
+    if (size > MAX_REMOTE_IMAGE_BYTES) {
+      request.destroy()
+      throw new Error('Image response is too large')
+    }
+
+    chunks.push(buffer)
+  }
+
+  return {
+    body: Buffer.concat(chunks, size),
+    headers
+  }
 }
 
 @Controller()
@@ -22,35 +58,15 @@ export class ImageController {
 
   @Get('/api/image')
   async index(@Query() input: ImageResizingDto, @Res() res: Response) {
-    const filePath = await this._getPath(input)
-    const headersPath = `${filePath}.json`
-    const isFileExists = await this._isFileExists(filePath)
-
-    if (isFileExists) {
-      const headers = JSON.parse((await promises.readFile(headersPath)).toString())
-
-      res.set(headers)
-      return createReadStream(filePath).pipe(res)
-    }
-
-    const url = await assertSafeOutboundUrl(input.url, {
+    const { lookup, url } = await assertSafeOutboundRequest(input.url, {
       allowedHosts: ALLOWED_IMAGE_HOSTS,
       allowedPrivateOrigins: FIRST_PARTY_IMAGE_ORIGINS
     })
 
-    let result: GotResponse<Buffer>
+    let result: { body: Buffer; headers: IncomingHttpHeaders }
 
     try {
-      result = await got(url.toString(), {
-        followRedirect: false,
-        responseType: 'buffer',
-        retry: {
-          limit: 0
-        },
-        timeout: {
-          request: 10_000
-        }
-      })
+      result = await fetchRemoteImage(url, lookup)
     } catch (error: unknown) {
       this.logger.warn(
         `Failed to fetch image from "${input.url}": ${getErrorMessage(error, 'Unknown got error')}`
@@ -60,9 +76,17 @@ export class ImageController {
     }
 
     const contentTypeHeader = result.headers['content-type']
-    const contentType = Array.isArray(contentTypeHeader) ? contentTypeHeader[0] : contentTypeHeader
+    const contentType = (
+      Array.isArray(contentTypeHeader) ? contentTypeHeader[0] : contentTypeHeader
+    )
+      ?.split(';', 1)[0]
+      .trim()
+      .toLowerCase()
 
-    if (!contentType?.toLowerCase().startsWith('image/')) {
+    if (
+      !contentType ||
+      !['image/gif', 'image/jpeg', 'image/png', 'image/webp'].includes(contentType)
+    ) {
       this.logger.warn(
         `Image URL "${input.url}" returned unsupported content type "${contentType}"`
       )
@@ -70,58 +94,34 @@ export class ImageController {
       return this._sendEmptyImageResponse(res)
     }
 
-    let fileBuffer = result.body
-    const width = input.w ? Number(input.w) : undefined
-    const height = input.h ? Number(input.h) : undefined
+    let safeImage: SafeImageResult
 
-    if (width > 0 || height > 0) {
-      try {
-        fileBuffer = await sharp(result.body).resize({ width, height }).toBuffer()
-      } catch (error: unknown) {
-        this.logger.warn(
-          `Failed to resize image from "${input.url}", serving original response instead: ${getErrorMessage(
-            error,
-            'Unknown sharp error'
-          )}`
-        )
-      }
-    }
-
-    const headers = {
-      'Content-Type': result.headers['content-type'],
-      'Content-Length': fileBuffer.length,
-      'Cache-Control': 'public, max-age=315360000, must-revalidate'
-    }
-
-    await Promise.all([
-      promises.writeFile(headersPath, JSON.stringify(headers), {
-        encoding: 'utf8'
-      }),
-      promises.writeFile(filePath, fileBuffer)
-    ])
-
-    res.set(headers)
-    this._getReadableStream(fileBuffer).pipe(res)
-  }
-
-  private async _isFileExists(filePath: string) {
     try {
-      const result = await promises.stat(filePath)
-      return result.isFile()
-    } catch {
-      return false
+      safeImage = await sanitizeRemoteImage(
+        result.body,
+        input.w === undefined ? undefined : Number(input.w),
+        input.h === undefined ? undefined : Number(input.h)
+      )
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Failed to safely process image from "${input.url}": ${getErrorMessage(
+          error,
+          'Unknown sharp error'
+        )}`
+      )
+
+      return this._sendEmptyImageResponse(res)
     }
-  }
 
-  private async _getPath(input: ImageResizingDto) {
-    const hash = md5(qs.stringify(input))
-    const dir = resolve(UPLOAD_DIR, hash.slice(0, 2), hash.slice(2, 4))
-
-    await promises.mkdir(dir, {
-      recursive: true
+    res.set({
+      'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+      'Content-Disposition': `inline; filename="image.${safeImage.extension}"`,
+      'Content-Length': safeImage.buffer.length,
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Content-Type': safeImage.contentType,
+      'X-Content-Type-Options': 'nosniff'
     })
-
-    return resolve(dir, hash.slice(4))
+    this._getReadableStream(safeImage.buffer).pipe(res)
   }
 
   private _getReadableStream(buffer: Buffer): Readable {
@@ -136,7 +136,9 @@ export class ImageController {
   private _sendEmptyImageResponse(res: Response) {
     res.status(204)
     res.set({
-      'Cache-Control': 'no-store'
+      'Cache-Control': 'no-store',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'X-Content-Type-Options': 'nosniff'
     })
 
     return res.end()

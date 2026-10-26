@@ -86,8 +86,37 @@ const UserAccount = () => {
         size: 'md',
         label: t('user.email.button')
       },
+      onChange: values => {
+        handleConfirmEmail(email, values.code)
+      }
+    })
+  }
+
+  function handleConfirmEmail(email: string, code: string) {
+    prompt({
+      title: t('user.email.headline'),
+      inputProps: {
+        name: 'currentPassword',
+        type: 'password',
+        label: t('login.password.label'),
+        rules: [
+          {
+            required: true,
+            message: t('login.password.required')
+          },
+          {
+            max: 100,
+            message: t('login.password.maxLength')
+          }
+        ]
+      },
+      submitProps: {
+        className: '!mt-4 px-5 min-w-24',
+        size: 'md',
+        label: t('components.change')
+      },
       fetch: async values => {
-        await UserService.updateEmail(email, values.code)
+        await UserService.updateEmail(email, code, values.currentPassword)
         updateUser({ email })
       }
     })

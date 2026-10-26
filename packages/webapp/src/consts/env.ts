@@ -4,6 +4,7 @@ export const DEVICEID_COOKIE_NAME = 'HEYFORM_DEVICE_ID'
 export const LOGGED_COOKIE_NAME = 'HEYFORM_LOGGED_IN'
 export const LOCALE_COOKIE_NAME = 'HEYFORM_LOCALE'
 export const REDIRECT_COOKIE_NAME = 'HEYFORM_REDIRECT'
+export const INVITATION_COOKIE_NAME = 'HEYFORM_INVITATION'
 
 export const HOMEPAGE_URL =
   window.heyform?.homepageURL || (import.meta.env.VITE_DASHBOARD_URL as string)
@@ -22,14 +23,24 @@ export const STRIPE_PUBLISHABLE_KEY =
 export const GOOGLE_RECAPTCHA_KEY =
   window.heyform?.googleRecaptchaKey || (import.meta.env.VITE_GOOGLE_RECAPTCHA_KEY as string)
 
+export const DISABLE_LOGIN_WITH_PASSWORD = helper.isTrue(
+  window.heyform?.disableLoginWithPassword || import.meta.env.VITE_DISABLE_LOGIN_WITH_PASSWORD
+)
 export const DISABLE_LOGIN_WITH_GOOGLE = helper.isTrue(
   window.heyform?.disableLoginWithGoogle || import.meta.env.VITE_DISABLE_LOGIN_WITH_GOOGLE
 )
 export const DISABLE_LOGIN_WITH_APPLE = helper.isTrue(
   window.heyform?.disableLoginWithApple || import.meta.env.VITE_DISABLE_LOGIN_WITH_APPLE
 )
+export const DISABLE_LOGIN_WITH_OIDC = helper.isTrue(
+  window.heyform?.disableLoginWithOidc ?? import.meta.env.VITE_DISABLE_LOGIN_WITH_OIDC ?? 'true'
+)
+export const OIDC_DISPLAY_NAME =
+  window.heyform?.oidcDisplayName || (import.meta.env.VITE_OIDC_DISPLAY_NAME as string) || 'SSO'
+export const OIDC_DISPLAY_ICON_URL =
+  window.heyform?.oidcDisplayIconUrl || (import.meta.env.VITE_OIDC_DISPLAY_ICON_URL as string) || ''
 export const VERIFY_USER_EMAIL = helper.isTrue(
-  window.heyform?.verifyUserEmail || import.meta.env.VITE_VERIFY_USER_EMAIL
+  window.heyform?.verifyUserEmail ?? import.meta.env.VITE_VERIFY_USER_EMAIL ?? 'true'
 )
 export const ENABLE_GOOGLE_FONTS = helper.isTrue(
   window.heyform?.enableGoogleFonts ?? import.meta.env.VITE_ENABLE_GOOGLE_FONTS ?? 'true'
@@ -50,6 +61,10 @@ export function isSsoOnly() {
 // "Back to tenant" button. undefined when not handed off via /sso.
 export function getTenantReturnUrl(): string | undefined {
   return window.heyform?.tenantReturnUrl
+}
+
+export function isSubmissionIpDisabled() {
+  return helper.isTrue(window.heyform?.disableSubmissionIp)
 }
 
 export function getVerifyEmailResendCooldownSeconds() {

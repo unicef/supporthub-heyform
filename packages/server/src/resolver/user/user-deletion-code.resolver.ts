@@ -14,7 +14,7 @@ export class UserDeletionCodeResolver {
   @Query(returns => Boolean)
   async userDeletionCode(@User() user: UserModel): Promise<boolean> {
     const key = `user_deletion:${user.id}`
-    const code = await this.authService.getVerificationCode(key)
+    const code = await this.authService.getVerificationCodeWithRateLimit(key)
 
     await this.mailService.accountDeletionRequest(user.email, code, user.lang)
 

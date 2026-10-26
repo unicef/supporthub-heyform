@@ -16,7 +16,13 @@ export interface SignedUpUser {
  */
 export async function signUpUser(
   baseUrl: string,
-  overrides: Partial<{ name: string; email: string; password: string }> = {}
+  overrides: Partial<{
+    name: string
+    email: string
+    password: string
+    teamId: string
+    inviteCode: string
+  }> = {}
 ): Promise<SignedUpUser> {
   const client = new E2EClient({ baseUrl })
   const name = overrides.name ?? uniqueName('E2E User')
@@ -24,7 +30,13 @@ export async function signUpUser(
   const password = overrides.password ?? strongPassword()
 
   await client.gqlOk('signUp', SIGN_UP_GQL, {
-    input: { name, email, password }
+    input: {
+      name,
+      email,
+      password,
+      teamId: overrides.teamId,
+      inviteCode: overrides.inviteCode
+    }
   })
 
   const detail = await client.gqlOk<{ id: string }>('userDetail', USER_DETAIL_GQL)

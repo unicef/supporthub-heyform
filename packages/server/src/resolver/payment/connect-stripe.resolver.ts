@@ -1,8 +1,9 @@
 import { BadRequestException } from '@nestjs/common'
 
-import { Auth, FormGuard } from '@decorator'
+import { Auth, FormGuard, Team } from '@decorator'
 import { ConnectStripeInput, ConnectStripeType } from '@graphql'
 import { helper } from '@heyform-inc/utils'
+import { TeamModel } from '@model'
 import { Args, Mutation, Resolver } from '@nestjs/graphql'
 import { FormService, PaymentService, RedisService } from '@service'
 
@@ -17,7 +18,16 @@ export class ConnectStripeResolver {
 
   @Mutation(returns => ConnectStripeType)
   @FormGuard()
-  async connectStripe(@Args('input') input: ConnectStripeInput): Promise<ConnectStripeType> {
+  async connectStripe(
+    @Team() team: TeamModel,
+    @Args('input') input: ConnectStripeInput
+  ): Promise<ConnectStripeType> {
+    if (!team.isOwner) {
+      throw new BadRequestException(
+        "You don't have permission to connect a Stripe account for this workspace"
+      )
+    }
+
     const key = `connect:stripe:${input.state}`
     const stateCache = await this.redisService.get(key)
 

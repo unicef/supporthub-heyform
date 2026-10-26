@@ -1,6 +1,6 @@
 const FORM_INTERFACES = `
 Field kind values:
-- welcome, thank_you, statement
+- group, welcome, thank_you, statement
 - short_text, long_text, number, yes_no
 - multiple_choice, picture_choice, file_upload
 - opinion_scale, rating, date, date_range, time
@@ -17,24 +17,28 @@ Field JSON shape:
   "properties": {},
   "layout": null
 }
-
-"validations" ACCEPTS ONLY THESE FOUR KEYS. Any other key is rejected:
-  required (boolean), min (number), max (number), matchExpected (boolean)
-There is no format, max_length, min_length, pattern or email/url validation key.
-Use "email" or "url" as the field KIND instead, and min/max for length limits.
-
-"properties" ACCEPTS ONLY THESE KEYS. Any other key is rejected:
-  showButton, buttonText, hideMarks, allowOther, allowMultiple, badge,
-  verticalAlignment, choices, randomize, choiceStyle, other, numberPreRow,
-  shape, total, start, leftLabel, centerLabel, rightLabel, defaultCountryCode,
-  currency, price, format, allowTime, use12Hours, tableColumns, score,
-  sourceUrl, buttonLinkUrl, redirectUrl, redirectOnCompletion, redirectDelay
-There is no allowed_file_types, max_files or any other key. All keys are
-camelCase — never snake_case.
-
-"choices" and "tableColumns" are arrays of OBJECTS, never of strings:
-  "choices": [{ "id": "12-character id", "label": "Low" }]
-  NOT "choices": ["Low"]
+Use only the keys shown above for fields. Use unique, nonempty IDs for fields and choices.
+Title and description must be rich-text arrays, e.g. ["Plain text"].
+Formatted nodes use ["tag", ["text or nested nodes"], {"attribute": "value"}],
+e.g. [["a", ["Website"], {"href": "https://example.com"}]]. Attributes must be objects,
+never a URL string; prefer plain text when formatting is unnecessary.
+Put legal terms text in description. Never use properties.html, placeholder, or helpText.
+Validations may only contain required (boolean), min/max (number), matchExpected (boolean).
+Properties may contain only these keys, when relevant to the field kind:
+- showButton, hideMarks, allowOther, allowMultiple, verticalAlignment, randomize,
+  allowTime, use12Hours, redirectOnCompletion: booleans
+- buttonText, badge, choiceStyle, other, shape, leftLabel, centerLabel, rightLabel,
+  defaultCountryCode, currency, format, sourceUrl, buttonLinkUrl, redirectUrl: strings
+- numberPreRow, total, start, score, redirectDelay: numbers
+- choices: [{"id":"unique id","label":"Choice text"}], optionally image/color (string),
+  score (number), isExpected (boolean)
+- tableColumns: [{"id":"unique id","label":"Column text","type":"text","required":false}]
+- price: {"type":"number","value":10} or {"type":"variable","ref":"variable id"}
+- fields: an array of child fields using the same field shape (for groups)
+Layout must be null or an object with mediaType (image/video), mediaUrl,
+backgroundColor, brightness (number between -100 and 100), align
+(inline/float_left/float_right/split_left/split_right/cover).
+Do not invent properties or put field content in unknown keys.
 
 Required properties per kind. These kinds are INVALID with empty properties:
 
@@ -57,8 +61,6 @@ Required properties per kind. These kinds are INVALID with empty properties:
 
 All other kinds take "properties": {}. file_upload takes {} — it has no
 configurable properties.
-
-Every "id" must be a distinct 12-character alphanumeric string.
 `
 
 const LOGIC_INTERFACES = `

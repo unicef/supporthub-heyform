@@ -1,7 +1,10 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 
-import { Divider, Modal } from '@/components'
+import { WorkspaceService } from '@/services'
+import { useParam } from '@/utils'
+
+import { Async, Divider, Modal } from '@/components'
 import { useModal, useUserStore, useWorkspaceStore } from '@/store'
 
 import { ProjectJoinedMemberItem, ProjectRemainingMemberItem } from './ProjectMemberItem'
@@ -9,7 +12,13 @@ import { ProjectJoinedMemberItem, ProjectRemainingMemberItem } from './ProjectMe
 const ProjectMembers = () => {
   const { t } = useTranslation()
 
-  const { workspace, project, members } = useWorkspaceStore()
+  const { workspaceId } = useParam()
+  const { workspace, project, members, setMembers } = useWorkspaceStore()
+
+  async function fetch() {
+    setMembers(workspaceId, await WorkspaceService.members(workspaceId))
+    return true
+  }
   const { user } = useUserStore()
 
   const joined = useMemo(() => {
@@ -28,7 +37,7 @@ const ProjectMembers = () => {
   )
 
   return (
-    <>
+    <Async fetch={fetch} refreshDeps={[workspaceId, project?.id]}>
       <div className="divide-accent-light divide-y">
         {joined.map(m => (
           <ProjectJoinedMemberItem key={m.id} member={m} />
@@ -46,13 +55,16 @@ const ProjectMembers = () => {
           </div>
         </div>
       )}
-    </>
+    </Async>
   )
 }
 
 export default function ProjectMembersModal() {
   const { t } = useTranslation()
-  const { isOpen, onOpenChange } = useModal('ProjectMembersModal')
+  const { isOpen, onOpenChange, close } = useModal('ProjectMembersModal')
+  const { projectId } = useParam()
+
+  useEffect(() => () => close(), [projectId, close])
 
   return (
     <Modal.Simple

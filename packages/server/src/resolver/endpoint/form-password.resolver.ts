@@ -1,12 +1,17 @@
-import { BadRequestException, Headers, UseGuards } from '@nestjs/common'
+import {
+  BadRequestException,
+  Headers,
+  InternalServerErrorException,
+  UseGuards
+} from '@nestjs/common'
 
-import { FORM_ENCRYPTION_KEY } from '@environments'
+import { BCRYPT_SALT, FORM_ENCRYPTION_KEY } from '@environments'
 import { VerifyPasswordInput } from '@graphql'
 import { EndpointAnonymousIdGuard } from '@guard'
 import { timestamp } from '@heyform-inc/utils'
 import { Args, Query, Resolver } from '@nestjs/graphql'
 import { FormService } from '@service'
-import { aesEncryptObject } from '@utils'
+import { aesEncryptObject, comparePassword, isPasswordHash, passwordHash } from '@utils'
 
 @Resolver()
 @UseGuards(EndpointAnonymousIdGuard)
@@ -32,15 +37,42 @@ export class FormPasswordResolver {
       throw new BadRequestException('The form does not active')
     }
 
-    if (!form.settings.requirePassword || input.password !== form.settings.password) {
+    const storedPassword = form.settings.password
+
+    if (!form.settings.requirePassword || !storedPassword) {
       throw new BadRequestException('The password does not match')
+    }
+
+    const matches = isPasswordHash(storedPassword)
+      ? await comparePassword(input.password, storedPassword)
+      : input.password === storedPassword
+
+    if (!matches) {
+      throw new BadRequestException('The password does not match')
+    }
+
+    let currentPasswordHash = storedPassword!
+
+    // Transparently migrate existing plaintext form passwords after the owner deploys this fix.
+    if (!isPasswordHash(storedPassword)) {
+      currentPasswordHash = await passwordHash(input.password, BCRYPT_SALT)
+      const updated = await this.formService.migrateLegacyPassword(
+        form.id,
+        storedPassword,
+        currentPasswordHash
+      )
+
+      if (!updated) {
+        throw new InternalServerErrorException('Failed to secure the form password')
+      }
     }
 
     return aesEncryptObject(
       {
         timestamp: timestamp(),
+        formId: form.id,
         anonymousId,
-        password: input.password
+        passwordHash: currentPasswordHash
       },
       FORM_ENCRYPTION_KEY
     )

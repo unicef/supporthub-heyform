@@ -142,7 +142,7 @@ export const Renderer: FC<RendererProps> = ({ form, query, locale, contactId }) 
         token.recaptchaToken = await recaptchaToken(captchaRef)
       }
 
-      const file = await new Uploader(form, values).start()
+      const file = await new Uploader(form, values, openTokenRef.current).start()
 
       const hiddenFields = (form!.hiddenFields || [])
         .map(field => {
@@ -221,7 +221,7 @@ export const Renderer: FC<RendererProps> = ({ form, query, locale, contactId }) 
   return (
     <>
       {helper.isValid(fontURL) && <link href={fontURL} rel="stylesheet" />}
-      <style dangerouslySetInnerHTML={{ __html: getThemeStyle(theme, query) }} />
+      <style>{getThemeStyle(theme, query)}</style>
 
       {isStripeEnabled(form) && <script id="stripe" src="https://js.stripe.com/v3/" />}
 
@@ -231,7 +231,7 @@ export const Renderer: FC<RendererProps> = ({ form, query, locale, contactId }) 
         locale={locale}
         stripeApiKey={(form as Any).stripe?.publishableKey}
         stripeAccountId={(form as Any).stripe?.accountId}
-        autoSave={!(form.settings?.enableTimeLimit && helper.isValid(form.settings?.timeLimit))}
+        autoSave={false}
         alwaysShowNextButton={true}
         customUrlRedirects={(form.settings as Any)?.customUrlRedirects}
         enableQuestionList={form.settings?.enableQuestionList}
@@ -241,7 +241,7 @@ export const Renderer: FC<RendererProps> = ({ form, query, locale, contactId }) 
 
       {/* Custom css */}
       {helper.isValid(form.themeSettings?.theme?.customCSS) && (
-        <style dangerouslySetInnerHTML={{ __html: form.themeSettings!.theme!.customCSS! }} />
+        <style>{form.themeSettings!.theme!.customCSS!}</style>
       )}
     </>
   )

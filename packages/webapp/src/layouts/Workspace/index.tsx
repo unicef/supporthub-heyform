@@ -11,7 +11,7 @@ import { helper, timestamp } from '@heyform-inc/utils'
 
 import Logo from '@/assets/logo.svg?react'
 import { Button, useAlert } from '@/components'
-import { REDIRECT_COOKIE_NAME, getTenantReturnUrl, isSsoOnly } from '@/consts'
+import { REDIRECT_COOKIE_NAME, VERIFY_USER_EMAIL, getTenantReturnUrl, isSsoOnly } from '@/consts'
 import { useAppStore, useUserStore, useWorkspaceStore } from '@/store'
 
 import { FormShell } from '../Form/FormShell'
@@ -41,7 +41,11 @@ export const LoginGuard: FC<LayoutProps> = ({ options, children }) => {
       const user = await UserService.userDetail()
       setUser(user)
 
-      if (!user.isEmailVerified && window.location.pathname !== '/verify-email') {
+      if (
+        VERIFY_USER_EMAIL &&
+        !user.isEmailVerified &&
+        window.location.pathname !== '/verify-email'
+      ) {
         return router.replace('/verify-email')
       }
     } finally {
@@ -274,21 +278,21 @@ const LayoutComponent: FC<LayoutProps> = ({ options, children }) => {
     <>
       <div
         className={cn(
-          'relative isolate flex min-h-svh w-full max-lg:flex-col',
-          {
-            '[&_[data-slot=layout-main]]:pt-16 [&_[data-slot=layout-main]]:lg:pt-16 [&_[data-slot=layout-sidebar]]:top-16': false
-          },
+          'bg-foreground lg:bg-background relative isolate flex min-h-svh w-full max-lg:flex-col',
           options?.className
         )}
       >
         <WorkspaceSidebar />
 
         <main
-          className="bg-foreground flex flex-1 flex-col lg:min-w-0 lg:pl-64"
+          className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pl-64 lg:pr-2 lg:pt-2"
           data-slot="layout-main"
         >
-          <div className="grow" data-slot="layout-container">
-            <div className="hf-page-shell flex min-h-full flex-col" data-slot="layout-inner">
+          <div
+            className="lg:bg-foreground lg:ring-accent-light dark:lg:ring-input grow p-6 lg:rounded-lg lg:p-10 lg:shadow-sm lg:ring-1"
+            data-slot="layout-container"
+          >
+            <div className="mx-auto flex min-h-full max-w-6xl flex-col" data-slot="layout-inner">
               <div className="mb-6 flex items-center justify-between lg:hidden">
                 <Button.Link
                   size="md"

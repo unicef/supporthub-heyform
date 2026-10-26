@@ -4,7 +4,7 @@ import {
   SubmissionCategoryEnum,
   Variable
 } from '@heyform-inc/shared-types-enums'
-import { IsEnum, IsNumber, IsOptional, Max, Min } from 'class-validator'
+import { IsBoolean, IsEnum, IsNumber, IsOptional, Max, Min } from 'class-validator'
 
 import { FormDetailInput, HiddenFieldType, PropertyInput, PropertyType } from './form.graphql'
 import { Field, InputType, ObjectType } from '@nestjs/graphql'
@@ -57,6 +57,12 @@ export class SubmissionAnswersInput extends FormDetailInput {
   @Max(30)
   @Min(10)
   limit?: number
+
+  // Only answers where the respondent typed an "Other" entry, for the report's Other row.
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsBoolean()
+  otherOnly?: boolean
 }
 
 @InputType()
@@ -162,6 +168,10 @@ export class SubmissionType {
 
   @Field()
   endAt: number
+
+  // Only set when the form displays IP addresses
+  @Field({ nullable: true })
+  ip?: string
 }
 
 @ObjectType()

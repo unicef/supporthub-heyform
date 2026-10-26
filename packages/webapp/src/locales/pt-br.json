@@ -35,6 +35,10 @@
     "pt-br": {
       "original": "Português (Brasil)",
       "translated": "Português brasileiro"
+    },
+    "es": {
+      "original": "Español",
+      "translated": "Espanhol"
     }
   },
   "timezones": {
@@ -749,6 +753,11 @@
         "label": "Insira o código de exclusão enviado para <strong>{{email}}</strong>.",
         "required": "O código de verificação não pode ficar vazio"
       },
+      "name": {
+        "label": "Digite o nome do projeto <strong>{{name}}</strong> para confirmar.",
+        "required": "O nome do projeto não pode ficar vazio",
+        "invalid": "Digite exatamente {{name}} para confirmar."
+      },
       "confirm": "Excluir projeto"
     }
   },
@@ -1232,6 +1241,10 @@
           "times": "vezes",
           "inEvery": "em cada"
         },
+        "displayIpAddress": {
+          "headline": "Mostrar os endereços IP dos respondentes",
+          "subHeadline": "Mostra o endereço IP de cada respondente na tabela de envios, nas exportações CSV e nos webhooks."
+        },
         "quotaLimit": {
           "headline": "Limite o número de envios",
           "subHeadline": "Isso permite que você defina um número total específico de envios permitidos para o seu formulário.",
@@ -1265,6 +1278,13 @@
         "respondent": {
           "headline": "Notificações por e-mail do respondente",
           "subHeadline": "Envie um e-mail de texto personalizado aos respondentes após o envio do formulário."
+        },
+        "recipients": {
+          "headline": "Destinatários adicionais",
+          "subHeadline": "Envie as respostas também para estes endereços, mesmo sem conta no HeyForm. Um endereço por linha, até {{max}}.",
+          "placeholder": "name@example.com",
+          "invalid": "{{email}} não é um endereço de e-mail válido",
+          "tooMany": "Adicione no máximo {{max}} destinatários"
         }
       },
       "protection": {
@@ -1316,6 +1336,7 @@
         "website": "Site",
         "inputTable": "Tabela",
         "submitDate": "Data de envio",
+        "ipAddress": "Endereço IP",
         "hiddenFields": "Campos ocultos",
         "contactInfo": "Informações de contato",
         "choices": "Escolhas",

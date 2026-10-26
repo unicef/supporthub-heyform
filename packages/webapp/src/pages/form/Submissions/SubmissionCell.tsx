@@ -4,8 +4,20 @@ import Big from 'big.js'
 import { FC, Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { cn, formatDay, unixDate } from '@/utils'
-import { CURRENCY_SYMBOLS, htmlUtils } from '@heyform-inc/answer-utils'
+import {
+  cn,
+  formatDay,
+  getFileUploadValue,
+  isHttpUrl,
+  isTrustedStripeReceiptUrl,
+  unixDate
+} from '@/utils'
+import {
+  CURRENCY_SYMBOLS,
+  OTHER_CHOICE_ID,
+  htmlUtils,
+  otherChoiceText
+} from '@heyform-inc/answer-utils'
 import { helper } from '@heyform-inc/utils'
 
 import { Badge, Checkbox, Image } from '@/components'
@@ -97,31 +109,35 @@ const DateRangeItem: FC<SubmissionCellProps> = ({ answer, field, isTableCell }) 
 }
 
 const FileUploadItem: FC<SubmissionCellProps> = ({ answer, field, isTableCell }) => {
-  if (answer.kind !== field.kind || !helper.isObject(answer.value)) {
+  const value = getFileUploadValue(
+    answer.value,
+    [...(window.heyform.uploadOrigins || []), window.location.origin],
+    window.location.origin
+  )
+
+  if (answer.kind !== field.kind || !value) {
     return null
   }
 
-  const filename = encodeURIComponent(answer.value.filename)
-  const downloadUrl = `${answer.value.cdnUrlPrefix}/${answer.value.cdnKey}?attname=${filename}`
-
   if (isTableCell) {
     return (
-      <div className="flex gap-1">
+      <a
+        className="flex gap-1"
+        href={value.url}
+        target="_blank"
+        rel="noreferrer"
+        onClick={event => event.stopPropagation()}
+      >
         <IconFile className="text-secondary h-5 w-5" />
-        <div className="flex-1 truncate">{answer.value.filename}</div>
-      </div>
+        <div className="flex-1 truncate">{value.filename}</div>
+      </a>
     )
   }
 
   return (
-    <a
-      className="inline-flex gap-1 text-nowrap"
-      href={downloadUrl}
-      target="_blank"
-      rel="noreferrer"
-    >
+    <a className="inline-flex gap-1 text-nowrap" href={value.url} target="_blank" rel="noreferrer">
       <IconFile className="text-secondary h-5 w-5" />
-      <div className="flex-1 whitespace-nowrap">{answer.value.filename}</div>
+      <div className="flex-1 whitespace-nowrap">{value.filename}</div>
     </a>
   )
 }
@@ -204,23 +220,30 @@ const InputTableItem: FC<SubmissionCellProps> = ({ answer, field, isTableCell })
 }
 
 const MultipleChoiceItem: FC<SubmissionCellProps> = ({ answer, field, isTableCell }) => {
+  const { t } = useTranslation()
   const choices = field.properties?.choices as Choice[]
+  // A blank "Other" is stored as an empty string and counts as an answer where the question allows it.
+  const hasOther =
+    helper.isObject(answer.value) &&
+    helper.isValid(otherChoiceText(answer.value.other, answer.properties || field.properties))
 
   if (
     answer.kind !== field.kind ||
     !helper.isValidArray(choices) ||
     !helper.isObject(answer.value) ||
-    (!helper.isValidArray(answer.value.value) && helper.isEmpty(answer.value.other))
+    (!helper.isValidArray(answer.value.value) && !hasOther)
   ) {
     return null
   }
 
-  const result = choices.filter(c => answer.value.value.includes(c.id))
+  const result = choices.filter(c => answer.value.value?.includes(c.id))
 
-  if (answer.value.other) {
+  if (hasOther) {
     result.push({
-      id: answer.value.other,
-      label: answer.value.other
+      id: OTHER_CHOICE_ID,
+      label: helper.isValid(answer.value.other)
+        ? answer.value.other
+        : String(t('form.builder.compose.otherChoice'))
     })
   }
 
@@ -269,6 +292,28 @@ const YesNoItem: FC<SubmissionCellProps> = ({ answer, field, isTableCell }) => {
   )
 }
 
+const LegalTermsItem: FC<SubmissionCellProps> = ({ answer, field, isTableCell }) => {
+  const { t } = useTranslation()
+
+  if (answer.kind !== field.kind || !helper.isBoolean(answer.value)) {
+    return null
+  }
+
+  // The form renderer's own labels, so the table shows what the respondent clicked.
+  return (
+    <div className={cn('flex', isTableCell ? 'gap-x-2 overflow-hidden py-2' : 'flex-wrap gap-2')}>
+      <Badge
+        color="zinc"
+        className={cn('text-primary', {
+          'text-nowrap': isTableCell
+        })}
+      >
+        {answer.value ? t('I accept') : t("I don't accept")}
+      </Badge>
+    </div>
+  )
+}
+
 const OpinionScaleItem: FC<SubmissionCellProps> = ({ answer, field, isTableCell }) => {
   if (answer.kind !== field.kind || !helper.isNumeric(answer.value)) {
     return null
@@ -295,6 +340,9 @@ const PaymentItem: FC<SubmissionCellProps> = ({ answer, field }) => {
   const amount = answer.value.amount || 0
   const amountString = CURRENCY_SYMBOLS[answer.value.currency] + Big(amount).div(100).toFixed(2)
   const isCompleted = helper.isValid(answer.value.paymentIntentId)
+  const receiptUrl = isTrustedStripeReceiptUrl(answer.value.receiptUrl)
+    ? answer.value.receiptUrl
+    : undefined
 
   return (
     <div className="flex items-center">
@@ -313,9 +361,9 @@ const PaymentItem: FC<SubmissionCellProps> = ({ answer, field }) => {
         <div className="ml-2">{amountString}</div>
       </div>
 
-      {isCompleted && (
+      {isCompleted && receiptUrl && (
         <div className="ml-2">
-          <a href={answer.value.receiptUrl} target="_blank" rel="noreferrer">
+          <a href={receiptUrl} target="_blank" rel="noreferrer">
             <IconArrowUpRight className="h-4 w-4" />
           </a>
         </div>
@@ -329,7 +377,7 @@ const SignatureItem: FC<SubmissionCellProps> = ({ answer, field }) => {
     return null
   }
 
-  return <Image src={answer.value} width={80} height={40} />
+  return <Image src={answer.value} width={80} height={40} resize={{ width: 80, height: 40 }} />
 }
 
 const TextItem: FC<SubmissionCellProps> = ({ answer, field, isTableCell }) => {
@@ -348,7 +396,7 @@ const URLItem: FC<SubmissionCellProps> = ({ answer, field, isTableCell }) => {
     return null
   }
 
-  if (isTableCell) {
+  if (isTableCell || !isHttpUrl(answer.value)) {
     return <div className="truncate">{answer.value}</div>
   }
 
@@ -390,6 +438,9 @@ export default function SubmissionCell(props: SubmissionCellProps) {
 
     case FieldKindEnum.YES_NO:
       return <YesNoItem {...props} />
+
+    case FieldKindEnum.LEGAL_TERMS:
+      return <LegalTermsItem {...props} />
 
     case FieldKindEnum.RATING:
     case FieldKindEnum.OPINION_SCALE:

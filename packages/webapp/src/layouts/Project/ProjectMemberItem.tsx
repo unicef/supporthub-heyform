@@ -18,15 +18,15 @@ export const ProjectMemberItem: FC<ProjectMemberItemProps & DOMProps> = ({ membe
 
   return (
     <div className="py-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-4">
           <Avatar
             className="flex-shrink-0"
             src={member.avatar}
             fallback={member.name}
             resize={{ width: 100, height: 100 }}
           />
-          <div className="text-sm">
+          <div className="min-w-0 break-words text-sm">
             <div className="font-medium">
               <span>{member.name}</span>
               {member.isYou && (
@@ -73,7 +73,7 @@ export const ProjectJoinedMemberItem: FC<ProjectMemberItemProps> = ({ member }) 
     {
       manual: true,
       refreshDeps: [workspaceId, projectId],
-      onError: (err: any) => {
+      onError: (err: Error) => {
         toast({
           title: t('project.members.leaveFailed'),
           message: err.message
@@ -86,11 +86,15 @@ export const ProjectJoinedMemberItem: FC<ProjectMemberItemProps> = ({ member }) 
     async () => {
       await ProjectService.removeMember(projectId, member.id)
       removeMemberFromProject(workspaceId, projectId, member.id)
+
+      toast({
+        title: t('project.members.removeSuccess')
+      })
     },
     {
       manual: true,
       refreshDeps: [workspaceId, projectId, member.id],
-      onError: (err: any) => {
+      onError: (err: Error) => {
         toast({
           title: t('project.members.removeFailed'),
           message: err.message
@@ -100,25 +104,34 @@ export const ProjectJoinedMemberItem: FC<ProjectMemberItemProps> = ({ member }) 
   )
 
   const children = useMemo(() => {
-    if (!member.isOwner && !member.isYou) {
-      if (member.isYou) {
-        return (
-          <Button size="md" loading={leaveLoading} onClick={handleLeave}>
-            {t('project.members.leave')}
-          </Button>
-        )
-      } else if (workspace?.isOwner) {
-        return (
-          <Button
-            className="bg-error text-primary-light hover:bg-error dark:text-primary"
-            size="md"
-            loading={removeLoading}
-            onClick={handleRemove}
-          >
-            {t('project.members.remove')}
-          </Button>
-        )
-      }
+    if (member.isOwner) {
+      return null
+    }
+
+    if (member.isYou) {
+      return (
+        <Button
+          className="shrink-0 rounded-lg"
+          size="md"
+          loading={leaveLoading}
+          onClick={handleLeave}
+        >
+          {t('project.members.leave')}
+        </Button>
+      )
+    }
+
+    if (workspace?.isOwner) {
+      return (
+        <Button
+          className="bg-error text-primary-light hover:bg-error dark:text-primary shrink-0 rounded-lg"
+          size="md"
+          loading={removeLoading}
+          onClick={handleRemove}
+        >
+          {t('project.members.remove')}
+        </Button>
+      )
     }
 
     return null
@@ -148,11 +161,15 @@ export const ProjectRemainingMemberItem: FC<ProjectMemberItemProps> = ({ member 
     async () => {
       await ProjectService.addMember(projectId, member.id)
       addMemberToProject(workspaceId, projectId, member.id)
+
+      toast({
+        title: t('project.members.addSuccess')
+      })
     },
     {
       manual: true,
       refreshDeps: [workspaceId, projectId, member.id],
-      onError: (err: any) => {
+      onError: (err: Error) => {
         toast({
           title: t('project.members.addFailed'),
           message: err.message
@@ -163,7 +180,7 @@ export const ProjectRemainingMemberItem: FC<ProjectMemberItemProps> = ({ member 
 
   return (
     <ProjectMemberItem member={member}>
-      <Button.Ghost size="md" loading={loading} onClick={run}>
+      <Button.Ghost className="shrink-0 rounded-lg" size="md" loading={loading} onClick={run}>
         {t('project.members.add')}
       </Button.Ghost>
     </ProjectMemberItem>

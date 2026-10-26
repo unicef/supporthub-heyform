@@ -1,3 +1,4 @@
+import { FormStatusEnum } from '@heyform-inc/shared-types-enums'
 import { BadRequestException } from '@nestjs/common'
 
 import { Auth, Team, TeamGuard, User } from '@decorator'
@@ -35,16 +36,20 @@ export class DissolveTeamResolver {
       await this.authService.checkVerificationCode(key, input.code)
     })
 
-    await this.teamService.delete(input.teamId)
-    await this.teamService.deleteAllMemberInTeam(input.teamId)
-
-    const forms = await this.formService.findAllInTeam(input.teamId)
+    const forms = await this.formService.findAllInTeam(team.id)
     const formIds = forms.map(form => form.id)
 
     if (formIds.length > 0) {
-      await this.formService.delete(formIds)
+      await this.formService.updateMany(formIds, {
+        'settings.active': false,
+        status: FormStatusEnum.TRASH
+      })
       await this.submissionService.deleteAll(formIds)
+      await this.formService.delete(formIds)
     }
+
+    await this.teamService.deleteAllMemberInTeam(team.id)
+    await this.teamService.delete(team.id)
 
     this.mailService.teamDeletionAlert(
       user.email,

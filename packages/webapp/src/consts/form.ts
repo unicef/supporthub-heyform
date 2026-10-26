@@ -1,5 +1,5 @@
 import { FieldKindEnum, FieldLayoutAlignEnum } from '@heyform-inc/shared-types-enums'
-import { IconCalendar, IconEyeOff, IconVariable } from '@tabler/icons-react'
+import { IconCalendar, IconEyeOff, IconVariable, IconWorld } from '@tabler/icons-react'
 
 import IconAddress from '@/assets/address.svg?react'
 import IconCountry from '@/assets/country.svg?react'
@@ -232,6 +232,13 @@ export const CUSTOM_FIELDS_CONFIGS = [
     label: 'form.builder.question.submitDate',
     textColor: '#1d4ed8',
     backgroundColor: '#dbeafe'
+  },
+  {
+    kind: FieldKindEnum.IP_ADDRESS,
+    icon: IconWorld,
+    label: 'form.builder.question.ipAddress',
+    textColor: '#334155',
+    backgroundColor: '#e5e7eb'
   },
   {
     kind: FieldKindEnum.HIDDEN_FIELDS,
@@ -507,7 +514,20 @@ export enum APP_STATUS_ENUM {
 export enum INTEGRATION_STATUS_ENUM {
   PERMITTED = 0,
   ACTIVE = 1,
-  DISABLED
+  DISABLED,
+  NEEDS_RECONNECT
+}
+
+export enum INTEGRATION_CONNECTION_STATUS_ENUM {
+  ACTIVE = 1,
+  NEEDS_RECONNECT = 2
+}
+
+export enum INTEGRATION_RECORD_STATUS_ENUM {
+  // Kept until the integration is reconnected, then sent
+  WAITING = 0,
+  SUCCEEDED = 1,
+  FAILED = 2
 }
 
 export const FORM_THEMES = [

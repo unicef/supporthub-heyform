@@ -10,7 +10,7 @@ export class UserSocialAccountModel extends Document {
     type: String,
     required: true
   })
-  kind: SocialLoginTypeEnum
+  kind: SocialLoginTypeEnum | 'oidc'
 
   @Prop({ required: true })
   userId: string

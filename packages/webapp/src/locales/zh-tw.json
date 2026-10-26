@@ -35,6 +35,10 @@
     "pt-br": {
       "original": "Português (Brasil)",
       "translated": "巴西葡萄牙語"
+    },
+    "es": {
+      "original": "Español",
+      "translated": "西班牙語"
     }
   },
   "timezones": {
@@ -743,6 +747,11 @@
         "label": "請輸入發送到 <strong>{{email}}</strong> 的刪除代碼。",
         "required": "驗證碼不能為空"
       },
+      "name": {
+        "label": "請輸入專案名稱 <strong>{{name}}</strong> 以確認。",
+        "required": "專案名稱不能為空",
+        "invalid": "請準確輸入 {{name}} 以確認。"
+      },
       "confirm": "刪除專案"
     },
     "moveto": {
@@ -1170,6 +1179,10 @@
           "times": "次數",
           "inEvery": "每隔"
         },
+        "displayIpAddress": {
+          "headline": "顯示填寫者的 IP 地址",
+          "subHeadline": "在提交列表、CSV 匯出和 Webhook 中顯示每位填寫者的 IP 地址。"
+        },
         "quotaLimit": {
           "headline": "限制提交數量",
           "subHeadline": "這允許您設置您的表單允許的特定總提交數量。",
@@ -1203,6 +1216,13 @@
         "respondent": {
           "headline": "受訪者郵件通知",
           "subHeadline": "表單提交後向受訪者發送自訂文本郵件。"
+        },
+        "recipients": {
+          "headline": "其他收件者",
+          "subHeadline": "即使沒有 HeyForm 帳號，也會將提交內容以電子郵件寄送到這些地址。每行一個地址，最多 {{max}} 個。",
+          "placeholder": "name@example.com",
+          "invalid": "{{email}} 不是有效的電子郵件地址",
+          "tooMany": "最多可新增 {{max}} 位收件者"
         }
       },
       "protection": {
@@ -1249,6 +1269,7 @@
         "website": "網站",
         "inputTable": "輸入表",
         "submitDate": "提交日期",
+        "ipAddress": "IP 地址",
         "hiddenFields": "隱藏字段",
         "contactInfo": "聯繫信息",
         "choices": "選項",

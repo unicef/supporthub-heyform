@@ -18,5 +18,5 @@ export function insertThemeStyle(customTheme?: FormTheme) {
     content += customTheme!.customCSS
   }
 
-  style.innerHTML = content
+  style.textContent = content
 }

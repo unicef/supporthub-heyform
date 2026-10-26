@@ -11,12 +11,40 @@ import {
   APPLE_LOGIN_WEB_CLIENT_ID,
   APP_DISABLE_REGISTRATION,
   APP_HOMEPAGE_URL,
+  DISABLE_LOGIN_WITH_OIDC,
   GOOGLE_LOGIN_CLIENT_ID,
-  GOOGLE_LOGIN_CLIENT_SECRET
+  GOOGLE_LOGIN_CLIENT_SECRET,
+  OIDC_ALLOW_PROVISIONING,
+  OIDC_CLIENT_AUTH_METHOD,
+  OIDC_CLIENT_ID,
+  OIDC_CLIENT_SECRET,
+  OIDC_ISSUER
 } from '@environments'
 import { helper } from '@heyform-inc/utils'
 import { UserSocialAccountModel } from '@model'
-import { UserInfo, appleLoginUrl, appleUserInfo, googleLoginUrl, googleUserInfo } from '@utils'
+import {
+  OIDC_LOGIN_KIND,
+  OidcAuthorizationRequest,
+  OidcSocialLogin,
+  UserInfo,
+  appleLoginUrl,
+  appleUserInfo,
+  googleLoginUrl,
+  googleUserInfo
+} from '@utils'
+
+export type SocialLoginKind = SocialLoginTypeEnum | typeof OIDC_LOGIN_KIND
+
+export interface SocialLoginAuthorization {
+  url: string
+  transaction?: OidcAuthorizationRequest['transaction']
+}
+
+export interface SocialLoginCallbackContext {
+  callbackParams: Record<string, unknown>
+  state: string
+  transaction?: OidcAuthorizationRequest['transaction']
+}
 
 const appleOptions = {
   webClientId: APPLE_LOGIN_WEB_CLIENT_ID,
@@ -30,6 +58,14 @@ const googleOptions = {
   clientSecret: GOOGLE_LOGIN_CLIENT_SECRET
 }
 
+const oidcClient = new OidcSocialLogin({
+  clientId: OIDC_CLIENT_ID,
+  clientSecret: OIDC_CLIENT_SECRET,
+  clientAuthMethod: OIDC_CLIENT_AUTH_METHOD,
+  issuer: OIDC_ISSUER,
+  redirectUrl: `${APP_HOMEPAGE_URL}/connect/${OIDC_LOGIN_KIND}/callback`
+})
+
 @Injectable()
 export class SocialLoginService {
   constructor(
@@ -38,32 +74,50 @@ export class SocialLoginService {
     private readonly userService: UserService
   ) {}
 
-  private static callbackUrl(kind: SocialLoginTypeEnum): string {
+  private static callbackUrl(kind: SocialLoginKind): string {
     return `${APP_HOMEPAGE_URL}/connect/${kind}/callback`
   }
 
-  public authUrl(kind: SocialLoginTypeEnum, state: string): string {
+  public async authUrl(
+    kind: SocialLoginKind,
+    state: string
+  ): Promise<SocialLoginAuthorization | undefined> {
     const redirectUrl = SocialLoginService.callbackUrl(kind)
 
     switch (kind) {
       case SocialLoginTypeEnum.APPLE:
-        return appleLoginUrl({
-          ...appleOptions,
-          redirectUrl,
-          state
-        } as any)
+        return {
+          url: appleLoginUrl({
+            ...appleOptions,
+            redirectUrl,
+            state
+          } as any)
+        }
 
       case SocialLoginTypeEnum.GOOGLE:
-        return googleLoginUrl({
-          ...googleOptions,
-          redirectUrl,
-          state
-        })
+        return {
+          url: googleLoginUrl({
+            ...googleOptions,
+            redirectUrl,
+            state
+          })
+        }
+
+      case OIDC_LOGIN_KIND:
+        if (DISABLE_LOGIN_WITH_OIDC) {
+          throw new BadRequestException('OIDC login is not configured')
+        }
+
+        return oidcClient.getAuthRequest(state)
     }
   }
 
-  public async userInfo(kind: string, code: string): Promise<UserInfo> {
-    const redirectUrl = SocialLoginService.callbackUrl(kind as SocialLoginTypeEnum)
+  public async userInfo(
+    kind: SocialLoginKind,
+    code: string,
+    context?: SocialLoginCallbackContext
+  ): Promise<UserInfo> {
+    const redirectUrl = SocialLoginService.callbackUrl(kind)
 
     switch (kind) {
       case SocialLoginTypeEnum.APPLE:
@@ -77,11 +131,18 @@ export class SocialLoginService {
           ...googleOptions,
           redirectUrl
         })
+
+      case OIDC_LOGIN_KIND:
+        if (DISABLE_LOGIN_WITH_OIDC || !context?.transaction) {
+          throw new BadRequestException('Invalid OIDC login transaction')
+        }
+
+        return oidcClient.getUserInfo(context.callbackParams, context.state, context.transaction)
     }
   }
 
   async findByOpenId(
-    kind: SocialLoginTypeEnum,
+    kind: SocialLoginKind,
     openId: string
   ): Promise<UserSocialAccountModel | null> {
     return this.userSocialAccountModel.findOne({
@@ -108,8 +169,12 @@ export class SocialLoginService {
     })
   }
 
-  async authCallback(kind: SocialLoginTypeEnum, code: string): Promise<string> {
-    const userInfo = await this.userInfo(kind, code)
+  async authCallback(
+    kind: SocialLoginKind,
+    code: string,
+    context?: SocialLoginCallbackContext
+  ): Promise<string> {
+    const userInfo = await this.userInfo(kind, code, context)
 
     if (helper.isEmpty(userInfo)) {
       throw new BadRequestException('Invalid social media user information')
@@ -127,33 +192,46 @@ export class SocialLoginService {
     if (account) {
       userId = account.userId
     } else {
+      const isOidc = kind === OIDC_LOGIN_KIND
+      const hasVerifiedEmail = Boolean(userInfo.user.email) && userInfo.emailVerified === true
+
+      if (isOidc && !hasVerifiedEmail) {
+        throw new BadRequestException('OIDC provider must return a verified email address')
+      }
+
       // Check if user exists
-      if (userInfo!.user.email) {
-        const existUser = await this.userService.findByEmail(userInfo!.user.email)
+      if (userInfo.user.email) {
+        const existUser = await this.userService.findByEmail(userInfo.user.email)
 
         if (existUser) {
           userId = existUser.id
+
+          if (isOidc && !existUser.isEmailVerified) {
+            await this.userService.update(existUser.id, {
+              isEmailVerified: true
+            })
+          }
         }
       }
 
       // Create new user
       if (!userId) {
-        if (APP_DISABLE_REGISTRATION) {
+        if (APP_DISABLE_REGISTRATION && !(isOidc && OIDC_ALLOW_PROVISIONING)) {
           throw new BadRequestException('Error: Registration is disabled')
         }
 
-        if (userInfo!.user.email) {
+        if (userInfo.user.email && (!isOidc || userInfo.emailVerified === true)) {
           // @ts-ignore
-          userInfo!.user.isEmailVerified = true
+          userInfo.user.isEmailVerified = true
         }
 
         // Create new user
-        userId = await this.userService.create(userInfo!.user)
+        userId = await this.userService.create(userInfo.user)
       }
 
       await this.create({
         kind,
-        openId: userInfo!.openId,
+        openId: userInfo.openId,
         userId: userId!
       })
     }

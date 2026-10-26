@@ -1,17 +1,27 @@
 import { Controller, Get, Header, Redirect, Req, Res } from '@nestjs/common'
 import { Request, Response } from 'express'
 
+import { COOKIE_INVITATION_NAME } from '@config'
 import {
   APP_DISABLE_REGISTRATION,
   APP_HOMEPAGE_URL,
   COOKIE_DOMAIN,
+  DISABLE_LOGIN_WITH_APPLE,
+  DISABLE_LOGIN_WITH_GOOGLE,
+  DISABLE_LOGIN_WITH_OIDC,
+  DISABLE_LOGIN_WITH_PASSWORD,
+  DISABLE_SUBMISSION_IP,
   ENABLE_GOOGLE_FONTS,
   GOOGLE_RECAPTCHA_KEY,
   HEYFORM_SSO_ONLY,
+  OIDC_DISPLAY_ICON_URL,
+  OIDC_DISPLAY_NAME,
   STRIPE_PUBLISHABLE_KEY,
-  VERIFY_EMAIL_RESEND_COOLDOWN
+  VERIFY_EMAIL_RESEND_COOLDOWN,
+  VERIFY_USER_EMAIL
 } from '@environments'
 import { hs } from '@heyform-inc/utils'
+import { TRUSTED_UPLOAD_ORIGINS } from '@utils'
 
 @Controller()
 export class DashboardController {
@@ -25,7 +35,16 @@ export class DashboardController {
       enableGoogleFonts: ENABLE_GOOGLE_FONTS,
       stripePublishableKey: STRIPE_PUBLISHABLE_KEY,
       googleRecaptchaKey: GOOGLE_RECAPTCHA_KEY,
-      verifyEmailResendCooldownSeconds: Math.ceil(hs(VERIFY_EMAIL_RESEND_COOLDOWN) / 1000)
+      uploadOrigins: TRUSTED_UPLOAD_ORIGINS,
+      verifyEmailResendCooldownSeconds: Math.ceil(hs(VERIFY_EMAIL_RESEND_COOLDOWN) / 1000),
+      verifyUserEmail: VERIFY_USER_EMAIL,
+      disableSubmissionIp: DISABLE_SUBMISSION_IP,
+      disableLoginWithPassword: DISABLE_LOGIN_WITH_PASSWORD,
+      disableLoginWithGoogle: DISABLE_LOGIN_WITH_GOOGLE,
+      disableLoginWithApple: DISABLE_LOGIN_WITH_APPLE,
+      disableLoginWithOidc: DISABLE_LOGIN_WITH_OIDC,
+      oidcDisplayName: OIDC_DISPLAY_NAME,
+      oidcDisplayIconUrl: OIDC_DISPLAY_ICON_URL
     }
   }
 
@@ -40,7 +59,7 @@ export class DashboardController {
 
   @Get('/sign-up')
   signUp(@Req() req: Request, @Res() res: Response) {
-    if (APP_DISABLE_REGISTRATION) {
+    if (APP_DISABLE_REGISTRATION && !req.cookies?.[COOKIE_INVITATION_NAME]) {
       return res.redirect(302, '/login')
     }
 

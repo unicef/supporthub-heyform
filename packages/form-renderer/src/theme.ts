@@ -56,6 +56,15 @@ export const GOOGLE_FONTS = [
 const FONT_FAMILY_ALIASES: Record<string, string> = {
   'Source Sans Pro': 'Source Sans 3'
 }
+const UNSAFE_CSS_VALUE_REGEX = /[<>{};]/
+
+function getSafeCSSValue(value?: string, fallback?: string): string | undefined {
+  if (!value || UNSAFE_CSS_VALUE_REGEX.test(value) || value.includes('\u0000')) {
+    return fallback
+  }
+
+  return value
+}
 
 export const DEFAULT_THEME: FormTheme = {
   fontFamily: GOOGLE_FONTS[0],
@@ -81,11 +90,16 @@ export function getWebFontURL(name?: string | string[]) {
     return ''
   }
 
-  const fontNames = ((helper.isArray(name) ? name : [name]) as string[])
-    .map(row => (row ? FONT_FAMILY_ALIASES[row] || row : row))
-    .filter(row => row && GOOGLE_FONTS.includes(row))
+  const requestedFontNames = ((helper.isArray(name) ? name : [name]) as string[]).map(row =>
+    row ? FONT_FAMILY_ALIASES[row] || row : row
+  )
+  const fontNames = requestedFontNames.filter(row => row && GOOGLE_FONTS.includes(row))
 
   if (helper.isEmpty(fontNames)) {
+    if (requestedFontNames.includes(SYSTEM_FONTS)) {
+      return ''
+    }
+
     fontNames.push(DEFAULT_THEME.fontFamily!)
   }
 
@@ -99,11 +113,16 @@ export function getWebFontURL(name?: string | string[]) {
 export function insertWebFont(name?: string | string[], id = 'heyform-webfont') {
   const href = getWebFontURL(name)
 
-  if (!href) {
+  if (typeof document === 'undefined') {
     return
   }
 
   let link = document.getElementById(id)
+
+  if (!href) {
+    link?.remove()
+    return
+  }
 
   if (!link) {
     link = document.createElement('link')
@@ -127,9 +146,34 @@ export function getTheme(theme?: FormTheme): FormTheme {
     newTheme.fontFamily = FONT_FAMILY_ALIASES[newTheme.fontFamily] || newTheme.fontFamily
   }
 
-  if (!newTheme.fontFamily || !GOOGLE_FONTS.includes(newTheme.fontFamily)) {
+  if (
+    !newTheme.fontFamily ||
+    (newTheme.fontFamily !== SYSTEM_FONTS && !GOOGLE_FONTS.includes(newTheme.fontFamily))
+  ) {
     newTheme.fontFamily = DEFAULT_THEME.fontFamily
   }
+
+  newTheme.questionTextColor = getSafeCSSValue(
+    newTheme.questionTextColor,
+    DEFAULT_THEME.questionTextColor
+  )
+  newTheme.answerTextColor = getSafeCSSValue(
+    newTheme.answerTextColor,
+    DEFAULT_THEME.answerTextColor
+  )
+  newTheme.buttonBackground = getSafeCSSValue(
+    newTheme.buttonBackground,
+    DEFAULT_THEME.buttonBackground
+  )
+  newTheme.buttonTextColor = getSafeCSSValue(
+    newTheme.buttonTextColor,
+    DEFAULT_THEME.buttonTextColor
+  )
+  newTheme.backgroundColor = getSafeCSSValue(
+    newTheme.backgroundColor,
+    DEFAULT_THEME.backgroundColor
+  )
+  newTheme.backgroundImage = getSafeCSSValue(newTheme.backgroundImage)
 
   return newTheme
 }
@@ -147,13 +191,37 @@ function getAdaptedColor(color: string, alphaNum = 0.5, step = 20): string {
  * starts with a digit ("Source Sans 3", "Exo 2") is not a valid family name,
  * so the whole `font-family` that reads the variable is dropped and the page
  * falls back to its default font. Quotes and backslashes are stripped so the
- * value cannot break out of the string.
+ * value cannot break out of the string. The system font stack is already a
+ * list of families, so it passes through as is.
  */
 export function cssFontFamily(name?: string): string {
+  if (name === SYSTEM_FONTS) {
+    return SYSTEM_FONTS
+  }
   return `"${String(name ?? '').replace(/["\\]/g, '')}"`
 }
 
+function escapeCSSString(value: string): string {
+  return value.replace(/["\\\n\r\f]/g, character => `\\${character.charCodeAt(0).toString(16)} `)
+}
+
+function getBackgroundImageStyle(backgroundImage?: string): string {
+  const safeBackgroundImage = getSafeCSSValue(backgroundImage)
+
+  if (!safeBackgroundImage) {
+    return ''
+  }
+
+  if (helper.isURL(safeBackgroundImage)) {
+    return `background-image: url("${escapeCSSString(safeBackgroundImage)}");`
+  }
+
+  return `background-image: ${safeBackgroundImage};`
+}
+
 export function getThemeStyle(theme: FormTheme, query?: Record<string, any>): string {
+  theme = getTheme(theme)
+
   if (helper.isTrue(query?.transparentBackground)) {
     theme.backgroundColor = 'transparent'
     theme.backgroundImage = undefined
@@ -189,7 +257,7 @@ export function getThemeStyle(theme: FormTheme, query?: Record<string, any>): st
     background-position: center;
     pointer-events: none;
     background-color: var(--heyform-background-color);
-    ${theme.backgroundImage ? (helper.isURL(theme.backgroundImage) ? `background-image: url(${theme.backgroundImage});` : `background-image: ${theme.backgroundImage}`) : ''}
+    ${getBackgroundImageStyle(theme.backgroundImage)}
   }
 
   .heyform-block-group {

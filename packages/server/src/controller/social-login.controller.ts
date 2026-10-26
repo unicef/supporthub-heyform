@@ -1,10 +1,9 @@
-import { SocialLoginTypeEnum } from '@heyform-inc/shared-types-enums'
 import { Controller, Get, Param, Post, Query, Req, Res } from '@nestjs/common'
 
 import { HEYFORM_SSO_ONLY } from '@environments'
 import { helper } from '@heyform-inc/utils'
-import { AuthService, RedisService, SocialLoginService } from '@service'
-import { Logger } from '@utils'
+import { AuthService, RedisService, SocialLoginKind, SocialLoginService } from '@service'
+import { Logger, OIDC_LOGIN_KIND } from '@utils'
 
 const { isValid } = helper
 const OAUTH_STATE_TTL = '10m'
@@ -65,7 +64,11 @@ export class SocialLoginController {
     }
 
     const oauthState = await this.authService.createOAuthState(req, res, query.state)
-    const authUrl = this.socialLoginService.authUrl(kind as any, oauthState)
+    const authorization = await this.socialLoginService.authUrl(kind as SocialLoginKind, oauthState)
+
+    if (authorization?.transaction) {
+      await this.authService.storeOAuthTransaction(oauthState, authorization.transaction)
+    }
 
     // Store redirect_uri to redis
     if (isValid(query.redirect_uri)) {
@@ -78,7 +81,7 @@ export class SocialLoginController {
       })
     }
 
-    if (helper.isEmpty(authUrl)) {
+    if (helper.isEmpty(authorization?.url)) {
       return res.render('index', {
         data: {
           error: `unable_connect_${kind}`.toUpperCase()
@@ -86,12 +89,12 @@ export class SocialLoginController {
       })
     }
 
-    res.redirect(302, authUrl)
+    res.redirect(302, authorization!.url)
   }
 
   @Get('/connect/:kind/callback')
   async authGetCallback(
-    @Param('kind') kind: SocialLoginTypeEnum,
+    @Param('kind') kind: SocialLoginKind,
     @Query() query: Record<string, string>,
     @Req() req: any,
     @Res() res: any
@@ -104,11 +107,7 @@ export class SocialLoginController {
   }
 
   @Post('/connect/:kind/callback')
-  async authPostCallback(
-    @Param('kind') kind: SocialLoginTypeEnum,
-    @Req() req: any,
-    @Res() res: any
-  ) {
+  async authPostCallback(@Param('kind') kind: SocialLoginKind, @Req() req: any, @Res() res: any) {
     if (this.rejectIfSsoOnly(res)) {
       return
     }
@@ -118,7 +117,7 @@ export class SocialLoginController {
   }
 
   private async handleCallback(
-    kind: SocialLoginTypeEnum,
+    kind: SocialLoginKind,
     query: Record<string, string>,
     req: any,
     res: any
@@ -126,9 +125,19 @@ export class SocialLoginController {
     try {
       await this.authService.verifyOAuthState(req, res, query.state)
 
+      const transaction =
+        kind === OIDC_LOGIN_KIND
+          ? await this.authService.consumeOAuthTransaction(query.state)
+          : undefined
+
       const userId = await this.socialLoginService.authCallback(
         kind,
-        query.code || query.credential
+        query.code || query.credential,
+        {
+          callbackParams: query,
+          state: query.state,
+          transaction
+        }
       )
 
       await this.authService.login({

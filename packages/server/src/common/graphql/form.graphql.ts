@@ -23,6 +23,8 @@ import {
   Variable
 } from '@heyform-inc/shared-types-enums'
 import {
+  ArrayMaxSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -30,14 +32,18 @@ import {
   IsNumber,
   IsObject,
   IsOptional,
+  IsString,
   IsUrl,
   Max,
-  Min
+  MaxLength,
+  Min,
+  MinLength
 } from 'class-validator'
 
 import { TeamDetailInput } from './team.graphql'
 import { FormAnalyticRangeEnum, FormModel, IntegrationStatusEnum } from '@model'
 import { Field, InputType, ObjectType } from '@nestjs/graphql'
+import { SUPPORTED_TRANSLATION_LANGUAGES } from '@utils'
 import GraphQLJSON, { GraphQLJSONObject } from 'graphql-type-json'
 
 @InputType()
@@ -101,6 +107,9 @@ class SharedPropertyInput {
 
   @Field({ nullable: true })
   allowOther?: boolean
+
+  @Field({ nullable: true })
+  allowBlankOther?: boolean
 
   @Field({ nullable: true })
   allowMultiple?: boolean
@@ -237,6 +246,11 @@ class LayoutInput {
 
 @InputType()
 class SharedFormFieldInput {
+  @Field(type => String, { nullable: true })
+  @IsOptional()
+  @IsString()
+  nextFieldId?: string
+
   @Field(type => GraphQLJSON, { nullable: true })
   title?: any[]
 
@@ -303,6 +317,8 @@ export class FormsInput {
 
   @Field({ nullable: true })
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
   keyword?: string
 }
 
@@ -478,6 +494,8 @@ export class UpdateFormInput extends FormDetailInput {
 
   @Field({ nullable: true })
   @IsOptional()
+  @MinLength(1)
+  @MaxLength(128)
   password?: string
 
   @Field({ nullable: true })
@@ -486,6 +504,10 @@ export class UpdateFormInput extends FormDetailInput {
 
   @Field(type => [String], { nullable: true })
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(SUPPORTED_TRANSLATION_LANGUAGES.length)
+  @ArrayUnique()
+  @IsIn(SUPPORTED_TRANSLATION_LANGUAGES, { each: true })
   languages?: string[]
 
   //
@@ -526,6 +548,10 @@ export class UpdateFormInput extends FormDetailInput {
 
   @Field({ nullable: true })
   @IsOptional()
+  displayIpAddress?: boolean
+
+  @Field({ nullable: true })
+  @IsOptional()
   enableProgress?: boolean
 
   @Field({ nullable: true })
@@ -535,6 +561,10 @@ export class UpdateFormInput extends FormDetailInput {
   @Field({ nullable: true })
   @IsOptional()
   enableNavigationArrows?: boolean
+
+  @Field({ nullable: true })
+  @IsOptional()
+  openLinksInNewTab?: boolean
 
   @Field({ nullable: true })
   @IsOptional()
@@ -576,6 +606,11 @@ export class UpdateFormInput extends FormDetailInput {
   @Field({ nullable: true })
   @IsOptional()
   enableEmailNotification?: boolean
+
+  // Validated and normalized in UpdateFormResolver (see normalizeNotificationRecipients)
+  @Field(type => [String], { nullable: true })
+  @IsOptional()
+  notificationRecipients?: string[]
 }
 
 @InputType()
@@ -639,6 +674,11 @@ class LogicInput {
 
   @Field(type => [LogicPayloadInput])
   payloads: LogicPayload[]
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsBoolean()
+  branchByAnswer?: boolean
 }
 
 @InputType()
@@ -683,11 +723,10 @@ export class UpdateFormVariablesInput extends FormDetailInput {
 
 @InputType()
 export class UpdateFormSchemasInput extends FormDetailInput {
-  //
-
-  //
-
-  //
+  @Field(type => [LogicInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  logics?: Logic[]
 
   @Field(type => [FormFieldInput])
   @IsArray()
@@ -777,6 +816,11 @@ export class FormThemeInput {
 @InputType()
 export class UpdateFormThemeInput extends FormDetailInput {
   @Field({ nullable: true })
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  @IsOptional()
+  favicon?: string
+
+  @Field({ nullable: true })
   @IsUrl()
   @IsOptional()
   logo?: string
@@ -788,6 +832,8 @@ export class UpdateFormThemeInput extends FormDetailInput {
 @InputType()
 export class SearchFormInput {
   @Field()
+  @IsString()
+  @MaxLength(100)
   keyword: string
 }
 
@@ -825,6 +871,9 @@ export class PropertyType {
 
   @Field({ nullable: true })
   allowOther?: boolean
+
+  @Field({ nullable: true })
+  allowBlankOther?: boolean
 
   @Field({ nullable: true })
   allowMultiple?: boolean
@@ -957,6 +1006,9 @@ export class FormSettingType {
   ipLimitTime?: number
 
   @Field({ nullable: true })
+  displayIpAddress?: boolean
+
+  @Field({ nullable: true })
   enableProgress?: boolean
 
   @Field({ nullable: true })
@@ -964,6 +1016,9 @@ export class FormSettingType {
 
   @Field({ nullable: true })
   enableNavigationArrows?: boolean
+
+  @Field({ nullable: true })
+  openLinksInNewTab?: boolean
 
   @Field({ nullable: true })
   locale?: string
@@ -992,6 +1047,9 @@ export class FormSettingType {
   @Field({ nullable: true })
   enableEmailNotification?: boolean
 
+  @Field(type => [String], { nullable: true })
+  notificationRecipients?: string[]
+
   // supporthub-fork: resolved from the owning team, not stored on the form.
   @Field({ nullable: true })
   removeBranding?: boolean
@@ -999,6 +1057,9 @@ export class FormSettingType {
 
 @ObjectType()
 export class ThemeSettingsType {
+  @Field({ nullable: true })
+  favicon?: string
+
   @Field({ nullable: true })
   logo?: string
 
@@ -1010,6 +1071,9 @@ export class ThemeSettingsType {
 export class FormFieldType {
   @Field()
   id: string
+
+  @Field(type => String, { nullable: true })
+  nextFieldId?: string
 
   @Field(type => GraphQLJSON, { nullable: true })
   title?: any[]
@@ -1133,6 +1197,9 @@ export class FormType {
 
   @Field(type => [GraphQLJSONObject], { nullable: true })
   logics?: Logic[]
+
+  @Field(type => [GraphQLJSONObject], { nullable: true })
+  draftLogics?: Logic[]
 
   @Field(type => [GraphQLJSONObject], { nullable: true })
   variables?: Variable[]
@@ -1283,6 +1350,22 @@ export class FormIntegrationType {
 
   @Field(type => Number)
   status: IntegrationStatusEnum
+
+  // An OAuth2 account is connected
+  @Field({ nullable: true })
+  connected?: boolean
+
+  // The team connection it uses (IntegrationConnectionType)
+  @Field({ nullable: true })
+  connectionId?: string
+
+  // Masked end of the saved API key, e.g. `••••a1b2`
+  @Field({ nullable: true })
+  apiKeyHint?: string
+
+  // Submissions waiting for the integration to be reconnected
+  @Field({ nullable: true })
+  waitingCount?: number
 }
 
 @InputType()

@@ -3,7 +3,15 @@ import { useCallback, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 
 import { WorkspaceService } from '@/services'
-import { clearCookie, getAuthState, setCookie, useParam, useRouter } from '@/utils'
+import {
+  clearCookie,
+  clearInvitationCookie,
+  getAuthState,
+  setInvitationCookie,
+  setSessionCookie,
+  useParam,
+  useRouter
+} from '@/utils'
 import { helper } from '@heyform-inc/utils'
 
 import { Async, Avatar, Button, Loader } from '@/components'
@@ -25,7 +33,8 @@ export default function WorkspaceInvitation() {
       const redirectUri = `/workspace/${workspaceId}/invitation/${code}`
 
       if (!getAuthState()) {
-        setCookie(REDIRECT_COOKIE_NAME, redirectUri, {})
+        setInvitationCookie({ teamId: workspaceId, inviteCode: code })
+        setSessionCookie(REDIRECT_COOKIE_NAME, redirectUri)
         return router.redirect('/login', {
           extend: false
         })
@@ -37,6 +46,7 @@ export default function WorkspaceInvitation() {
 
       setWorkspaces(result)
       clearCookie(REDIRECT_COOKIE_NAME)
+      clearInvitationCookie()
       router.replace(`/workspace/${workspaceId}`)
     },
     {
@@ -46,7 +56,13 @@ export default function WorkspaceInvitation() {
   )
 
   const fetch = useCallback(async () => {
+    clearInvitationCookie()
+
     const result = await WorkspaceService.publicDetail(workspaceId, code)
+
+    if (result.allowJoinByInviteLink && !getAuthState()) {
+      setInvitationCookie({ teamId: workspaceId, inviteCode: code })
+    }
 
     setWorkspace(result)
     return helper.isValid(result)
@@ -88,7 +104,13 @@ export default function WorkspaceInvitation() {
               resize={{ width: 100, height: 100 }}
             />
             <div className="flex-1 truncate">{workspace?.name}</div>
-            <Button className="min-w-20" size="md" loading={loading} onClick={run}>
+            <Button
+              className="min-w-20"
+              size="md"
+              loading={loading}
+              disabled={!workspace?.allowJoinByInviteLink}
+              onClick={run}
+            >
               {t('workspace.invitation.join')}
             </Button>
           </div>

@@ -260,7 +260,10 @@ function validateMultipleChoice(rule: FieldsToValidateRules, value: AnswerValue)
     value.value = []
   }
 
-  if (value.value.length < 1 && helper.isEmpty(value?.other)) {
+  // A blank "Other" is an answer only on questions that allow it.
+  const isBlankOther = !!(rule.allowOther && rule.allowBlankOther && value?.other === '')
+
+  if (value.value.length < 1 && helper.isEmpty(value?.other) && !isBlankOther) {
     throw new ValidateError({
       id: rule.id,
       kind: rule.kind,
@@ -281,7 +284,9 @@ function validateMultipleChoice(rule: FieldsToValidateRules, value: AnswerValue)
       })
     }
   } else {
-    if (!(helper.isNil(value?.other) || (isOtherExists = helper.isValid(value?.other)))) {
+    isOtherExists = isBlankOther || helper.isValid(value?.other)
+
+    if (!helper.isNil(value?.other) && !isOtherExists) {
       throw new ValidateError({
         id: rule.id,
         kind: rule.kind,
@@ -402,12 +407,35 @@ function validateDateRange(rule: FieldsToValidateRules, value: AnswerValue) {
 }
 
 function validateFile(rule: FieldsToValidateRules, value: AnswerValue) {
-  if (!helper.isValid(value) && helper.isObject(value)) {
+  let url: unknown = value
+
+  if (helper.isObject(value)) {
+    url = value.url
+
+    if (typeof url !== 'string') {
+      const prefix = value.urlPrefix ?? value.cdnUrlPrefix
+      const key = value.key ?? value.cdnKey
+
+      if (typeof prefix === 'string' && typeof key === 'string' && key.length > 0) {
+        url = `${prefix.replace(/\/$/, '')}/${key.replace(/^\//, '')}`
+      }
+    }
+  }
+
+  let valid = false
+
+  if (typeof url === 'string') {
+    try {
+      valid = ['http:', 'https:'].includes(new URL(url).protocol)
+    } catch {}
+  }
+
+  if (!valid) {
     throw new ValidateError({
       id: rule.id,
       kind: rule.kind,
       title: rule.title,
-      message: 'This field is required'
+      message: 'Please upload a valid file'
     })
   }
 }
@@ -548,16 +576,46 @@ function validateLength(value: AnswerValue, min?: number, max?: number): boolean
   return (max ? value.length <= max : true) && value.length >= (min || 0)
 }
 
-function validateLegalTerms(rule: FieldsToValidateRules, value: AnswerValue): boolean {
-  return (rule.required && helper.isTrue(value)) || false
+function validateLegalTerms(rule: FieldsToValidateRules, value: AnswerValue): void {
+  if (typeof value !== 'boolean' || (rule.required && value !== true)) {
+    throw new ValidateError({
+      id: rule.id,
+      kind: rule.kind,
+      title: rule.title,
+      message: 'This field must be accepted'
+    })
+  }
 }
 
-function validateInputTable(rule: FieldsToValidateRules, value: AnswerValue): boolean {
-  return (rule.required && helper.isValidArray(value)) || false
+function validateInputTable(rule: FieldsToValidateRules, value: AnswerValue): void {
+  if (!helper.isArray(value) || !value.every(row => helper.isPlainObject(row))) {
+    throw new ValidateError({
+      id: rule.id,
+      kind: rule.kind,
+      title: rule.title,
+      message: 'This field must contain valid table rows'
+    })
+  }
 }
 
-function validateSignature(rule: FieldsToValidateRules, value: AnswerValue): boolean {
-  return (
-    (rule.required && helper.isValid(value) && value.startsWith('data:image/png;base64,')) || false
-  )
+function validateSignature(rule: FieldsToValidateRules, value: AnswerValue): void {
+  let valid = helper.isString(value) && value.startsWith('data:image/png;base64,')
+
+  if (!valid && helper.isString(value)) {
+    try {
+      const url = new URL(value)
+      valid = url.protocol === 'http:' || url.protocol === 'https:'
+    } catch {
+      valid = false
+    }
+  }
+
+  if (!valid) {
+    throw new ValidateError({
+      id: rule.id,
+      kind: rule.kind,
+      title: rule.title,
+      message: 'This field must contain a valid signature'
+    })
+  }
 }
